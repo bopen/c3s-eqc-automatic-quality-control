@@ -1,0 +1,17 @@
+{
+  "template": "https://github.com/ecmwf-projects/cookiecutter-conda-package",
+  "commit": "a47d072ceb10df5711323495bc7b50b7ab4cb562",
+  "checkout": null,
+  "context": {
+    "cookiecutter": {
+      "project_name": "c3s-eqc-automatic-quality-control",
+      "project_slug": "c3s_eqc_automatic_quality_control",
+      "project_short_description": "C3S EQC Automatic Quality Control",
+      "copyright_holder": "European Union",
+      "copyright_year": "2022",
+      "mypy_strict": "True",
+      "_template": "https://github.com/ecmwf-projects/cookiecutter-conda-package"
+    }
+  },
+  "directory": null
+}
