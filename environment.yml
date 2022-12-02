@@ -12,3 +12,26 @@ dependencies:
 - sphinx
 - sphinx-autoapi
 # DO NOT EDIT ABOVE THIS LINE, ADD DEPENDENCIES BELOW
+- cdsapi
+- cfgrib
+- cf-units
+- click
+- dask
+- fsspec
+- geopandas
+- matplotlib
+- netCDF4
+- pandas
+- rich
+- sqlalchemy
+- toml
+- xarray
+- pip
+- pip:
+  - cacholote
+  - cads-toolbox
+  - cgul
+  - emohawk
+  - jupyterlab
+  - kaleido
+  - plotly
