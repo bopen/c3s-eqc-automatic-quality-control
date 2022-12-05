@@ -328,12 +328,10 @@ def download_and_transform(
         request_list.extend(split_request(request, chunks))
     datasets = []
     for n, request_chunk in enumerate(request_list):
-        logging.info(f"Gathering file {n+1} out of {len(request_list)}...")
         ds = download_and_transform_chunk(
             collection_id, request=request_chunk, f=f, open_with=open_with
         )
         datasets.append(ds)
-        logging.info("...Done")
     if open_with == "xarray":
         ds = xr.merge(datasets, **kwargs)
     else:
