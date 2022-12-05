@@ -21,14 +21,27 @@ import plotly.express as px
 import xarray as xr
 
 
+VAR_NAMES = {
+    "2m_temperature": "t2m",
+    "skin_temperature": "skt",
+}
+
+
 def line_plot(
     ds: xr.Dataset,
+    var: str,
     title: str = "DAILY MEAN TEMPERATURE",
 ):
-    fig = px.line(
-        x=ds["time"],
-        y=ds["t2m"] - 273.15,
-    )
+    try:
+        fig = px.line(
+            x=ds["time"],
+            y=ds[VAR_NAMES[var]] - 273.15,
+        )
+    except KeyError as exc:
+        raise ValueError(
+            f"{var} not available for plot. "
+            f"Available variables: {list(VAR_NAMES.keys())}"
+        ) from exc
     fig.update_layout(
         xaxis_title="time",
         yaxis_title="t2m",

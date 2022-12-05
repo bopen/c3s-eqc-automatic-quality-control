@@ -108,8 +108,16 @@ def run(
     config_file: str,
     target_dir: str,
 ):
+    original_cwd = os.getcwd()
     with open(config_file, "r", encoding="utf-8") as f:
         request = yaml.safe_load(f)
+
+    # Move into qar subfolder
+    qar_folder_path, qar_run_number = get_qar_params(target_dir, request["qar_id"])
+    run_sub = os.path.join(qar_folder_path, f"run_{qar_run_number}")
+    os.makedirs(run_sub)
+    os.chdir(run_sub)
+
     request, cads_request = process_request(request)
     chunks = request.get("chunks", {"year": 1, "month": 1})
 
@@ -119,23 +127,25 @@ def run(
         chunks=chunks
     )
 
-    qar_folder_path, qar_run_number = get_qar_params(target_dir, request["qar_id"])
-    run_sub = os.path.join(qar_folder_path, f"run_{qar_run_number}")
-    os.makedirs(run_sub)
-
     # TODO: SANITIZE ATTRS BEFORE SAVING
     with open(os.path.join(run_sub, "meta.yml") , "w", encoding="utf-8") as f:
         f.write(yaml.dump(data.attrs))
 
     for d in request.get("diagnostics"):
         if d in list_diagnostics():
-            fig = plot.line_plot(getattr(diagnostics, d)(data).squeeze())
+            fig = plot.line_plot(
+                getattr(diagnostics, d)(data).squeeze(),
+                var=request["variable"]
+            )
             d_res = f"{os.path.join(run_sub, d)}.png"
             logging.info(f"Saving result for : {d_res}")
             fig.write_image(d_res)
         else:
-            logging.error(
-                f"Skipping diagnostic {d} since is not available."
+            logging.warn(
+                f"Skipping diagnostic {d} since is not available. "
                 "Run 'eqc diagnostics' to see available diagnostics."
             )
+
+    # Move back into original folder
+    os.chdir(original_cwd)
     return
