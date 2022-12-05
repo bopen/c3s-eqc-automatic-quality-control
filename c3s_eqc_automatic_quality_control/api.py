@@ -42,7 +42,9 @@ collection_id: reanalysis-era5-single-levels
 product_type:  reanalysis
 format: grib
 time: [06, 18]
-variable: 2m_temperature
+variables:
+  - 2m_temperature
+  - skin_temperature
 start: 2021-06
 stop: 2021-07
 diagnostics:
@@ -71,11 +73,18 @@ def process_request(
         logging.info(f"No switch month day defined: Default is {SWITCH_MONTH_DAY}")
         day = SWITCH_MONTH_DAY
     reduced = {k: v for k, v in request.items() if k in CATALOG_ALLOWED_KEYS}
-    cads_request = download.update_request_date(
-        reduced, start=request["start"],
-        stop=request.get("stop"),
-        switch_month_day=day
-    )
+    cads_request = {}
+
+    # Request to CADS are single variable only
+    for var in request["variables"]:
+        reduced["variable"] = var
+        cads_request.update({
+            var: download.update_request_date(
+                reduced, start=request["start"],
+                stop=request.get("stop"),
+                switch_month_day=day
+            )}
+        )
     return request, cads_request
 
 
@@ -121,30 +130,31 @@ def run(
     request, cads_request = process_request(request)
     chunks = request.get("chunks", {"year": 1, "month": 1})
 
-    data = download.download_and_transform(
-        collection_id=request["collection_id"],
-        requests=cads_request,
-        chunks=chunks
-    )
+    for var, req in cads_request.items():
+        data = download.download_and_transform(
+            collection_id=request["collection_id"],
+            requests=req,
+            chunks=chunks
+        )
 
-    # TODO: SANITIZE ATTRS BEFORE SAVING
-    with open(os.path.join(run_sub, "meta.yml") , "w", encoding="utf-8") as f:
-        f.write(yaml.dump(data.attrs))
+        # TODO: SANITIZE ATTRS BEFORE SAVING
+        with open(os.path.join(run_sub, f"{var}_metadata.yml") , "w", encoding="utf-8") as f:
+            f.write(yaml.dump(data.attrs))
 
-    for d in request.get("diagnostics"):
-        if d in list_diagnostics():
-            fig = plot.line_plot(
-                getattr(diagnostics, d)(data).squeeze(),
-                var=request["variable"]
-            )
-            d_res = f"{os.path.join(run_sub, d)}.png"
-            logging.info(f"Saving result for : {d_res}")
-            fig.write_image(d_res)
-        else:
-            logging.warn(
-                f"Skipping diagnostic '{d}' since is not available. "
-                "Run 'eqc diagnostics' to see available diagnostics."
-            )
+        for d in request.get("diagnostics"):
+            if d in list_diagnostics():
+                fig = plot.line_plot(
+                    getattr(diagnostics, d)(data).squeeze(),
+                    var=var
+                )
+                res = f"{run_sub}/{var}_{d}.png"
+                logging.info(f"Saving result for : {res}")
+                fig.write_image(res)
+            else:
+                logging.warn(
+                    f"Skipping diagnostic '{d}' since is not available. "
+                    "Run 'eqc diagnostics' to see available diagnostics."
+                )
 
     # Move back into original folder
     os.chdir(original_cwd)

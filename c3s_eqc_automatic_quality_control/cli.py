@@ -20,8 +20,9 @@ This module manages the command line interfaces.
 import logging
 import os
 
-import click
+import rich
 import rich.logging
+import typer
 
 from . import api
 
@@ -39,53 +40,38 @@ logging.basicConfig(
     ],
 )
 
+app = typer.Typer(
+    no_args_is_help=True,
+    help="C3S EQC Automatic Quality Control CLI",
+)
 
-@click.group()
-@click.version_option(version=None, prog_name="eqc", message="C3S EQC AQC %(version)s")
+
 def eqc():
-    """C3S EQC Automatic Quality Control CLI"""
-    pass
+    app()
 
 
-@click.command()
+@app.command(name="diagnostics")
 def show_diagnostics():
     """Show available diagnostic function names."""
+    table = rich.table.Table("Available diagnostics")
     for d in api.list_diagnostics():
-        print(d)
+        table.add_row(d)
+    rich.print(table)
 
 
-eqc.add_command(show_diagnostics, "diagnostics")
-
-
-@click.command()
+@app.command(name="show-config-template")
 def show_config_template():
     """Show template configuration file."""
-    api.show_config_template()
+    rich.print(api.TEMPLATE)
 
 
-eqc.add_command(show_config_template, "config-template")
-
-
-@click.command()
-@click.argument("config_file", type=click.STRING, required=False)
-@click.option(
-    "target_dir",
-    "-t",
-    default=os.getcwd(),
-    help="Path to the output folder. Default to current directory."
-)
+@app.command()
 def run(
     config_file: str,
-    target_dir: str,
+    target_dir: str = typer.Option(os.getcwd(), "--target-dir", "-t"),
 ):
-    """Update Quality Assurance Report."""
-    if config_file is None:
-        logging.error("QAR config file is required.")
-        logging.error("Sample config:")
-        api.show_config_template()
-        return
-
     api.run(config_file, target_dir)
 
 
-eqc.add_command(run, "run")
+if __name__ == "__main__":
+    eqc()
