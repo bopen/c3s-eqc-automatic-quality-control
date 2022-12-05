@@ -30,7 +30,7 @@ VAR_NAMES = {
 def line_plot(
     ds: xr.Dataset,
     var: str,
-    title: str = "DAILY MEAN TEMPERATURE",
+    title: str = "DAILY MEAN",
 ):
     try:
         fig = px.line(
@@ -44,7 +44,7 @@ def line_plot(
         ) from exc
     fig.update_layout(
         xaxis_title="time",
-        yaxis_title="t2m",
+        yaxis_title=var,
         title=title
     )
     return fig
