@@ -42,8 +42,7 @@ collection_id: reanalysis-era5-single-levels
 product_type:  reanalysis
 format: grib
 time: [06, 18]
-variables:
-  - 2m_temperature
+variable: 2m_temperature
 start: 2021-06
 stop: 2021-07
 diagnostics:
@@ -72,11 +71,12 @@ def process_request(
         logging.info(f"No switch month day defined: Default is {SWITCH_MONTH_DAY}")
         day = SWITCH_MONTH_DAY
     reduced = {k: v for k, v in request.items() if k in CATALOG_ALLOWED_KEYS}
-    return download.update_request_date(
+    cads_request = download.update_request_date(
         reduced, start=request["start"],
         stop=request.get("stop"),
         switch_month_day=day
     )
+    return request, cads_request
 
 
 def get_next_run_number(
@@ -110,13 +110,12 @@ def run(
 ):
     with open(config_file, "r", encoding="utf-8") as f:
         request = yaml.safe_load(f)
+    request, cads_request = process_request(request)
+    chunks = request.get("chunks", {"year": 1, "month": 1})
 
-    chunks = request.get("chunks")
-    if chunks is None:
-        chunks = {"year": 1, "month": 1}
     data = download.download_and_transform(
         collection_id=request["collection_id"],
-        requests=process_request(request),
+        requests=cads_request,
         chunks=chunks
     )
 
@@ -134,4 +133,9 @@ def run(
             d_res = f"{os.path.join(run_sub, d)}.png"
             logging.info(f"Saving result for : {d_res}")
             fig.write_image(d_res)
+        else:
+            logging.error(
+                f"Skipping diagnostic {d} since is not available."
+                "Run 'eqc diagnostics' to see available diagnostics."
+            )
     return

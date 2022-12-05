@@ -27,7 +27,7 @@ def line_plot(
 ):
     fig = px.line(
         x=ds["time"],
-        y=ds["z"] - 273.15,
+        y=ds["t2m"] - 273.15,
     )
     fig.update_layout(
         xaxis_title="time",
