@@ -15,7 +15,6 @@ dependencies:
 - cdsapi
 - cfgrib
 - cf-units
-- click
 - dask
 - fsspec
 - geopandas
@@ -24,6 +23,7 @@ dependencies:
 - pandas
 - rich
 - sqlalchemy
+- typer
 - toml
 - xarray
 - pip
