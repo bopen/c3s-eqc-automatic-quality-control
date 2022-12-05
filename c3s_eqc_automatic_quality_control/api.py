@@ -142,7 +142,7 @@ def run(
             fig.write_image(d_res)
         else:
             logging.warn(
-                f"Skipping diagnostic {d} since is not available. "
+                f"Skipping diagnostic '{d}' since is not available. "
                 "Run 'eqc diagnostics' to see available diagnostics."
             )
 
