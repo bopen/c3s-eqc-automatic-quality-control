@@ -16,6 +16,7 @@ This module offers plot functions to visualise diagnostic results.
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Any
 
 import plotly.express as px
 import xarray as xr
@@ -30,7 +31,7 @@ def line_plot(
     ds: xr.Dataset,
     var: str,
     title: str = "",
-):
+) -> Any:
     try:
         fig = px.line(
             x=ds["time"],

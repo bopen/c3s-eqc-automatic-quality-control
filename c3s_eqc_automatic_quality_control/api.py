@@ -22,9 +22,8 @@ import re
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from inspect import getmembers, isfunction
-from typing import Dict
+from typing import Any, Dict, List, Tuple
 
-import cacholote
 import yaml
 
 from . import diagnostics, download, plot
@@ -57,19 +56,19 @@ switch_month_day: 9
 """
 
 
-def show_config_template():
+def show_config_template() -> None:
     """Show template configuration file."""
     print(f"{TEMPLATE}")
 
 
-def list_diagnostics():
+def list_diagnostics() -> List[str]:
     """Return available diagnostic function names."""
     return [f[0] for f in getmembers(diagnostics, isfunction)]
 
 
 def process_request(
-    request: Dict,
-):
+    request: Dict[Any, Any],
+) -> Tuple[Dict[Any, Any], Dict[Any, Any]]:
     day = request.get("switch_month_day")
     if day is None:
         logging.warning(f"No switch month day defined: Default is {SWITCH_MONTH_DAY}")
@@ -102,7 +101,7 @@ def process_request(
 
 def get_next_run_number(
     qar_folder_path: str,
-):
+) -> int:
     subdirs = list(os.walk(qar_folder_path))
     if not subdirs:
         return 1
@@ -115,7 +114,9 @@ def get_next_run_number(
     return max(runs) + 1
 
 
-def prepare_run_workdir(request: Dict, target_dir: str):
+def prepare_run_workdir(
+    request: Dict[Any, Any], target_dir: str
+) -> Tuple[pathlib.Path, str, int]:
     qar_id = request.pop("qar_id")
     run_n = request.pop("run_n", 0)
     run_sub = pathlib.Path(target_dir) / qar_id / f"run_{run_n}"
@@ -133,7 +134,7 @@ def prepare_run_workdir(request: Dict, target_dir: str):
 def run(
     config_file: str,
     target_dir: str,
-):
+) -> None:
     with open(config_file, "r", encoding="utf-8") as f:
         request = yaml.safe_load(f)
 

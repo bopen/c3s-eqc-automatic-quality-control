@@ -335,7 +335,7 @@ def download_and_transform(
         )
         datasets.append(ds)
     if open_with == "xarray":
-        with dask.config.set(**{"array.slicing.split_large_chunks": True}):
+        with dask.config.set({"array.slicing.split_large_chunks": True}):
             ds = xr.merge(datasets, **kwargs)
     else:
         ds = pd.concat(datasets, **kwargs)

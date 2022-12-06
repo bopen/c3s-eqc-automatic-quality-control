@@ -46,6 +46,8 @@ def spatial_mean(
     return (ds * weights).sum(dim=[lon, lat])  # type: ignore
 
 
-def spatial_daily_mean(ds: xr.Dataset) -> xr.Dataset:
+def spatial_daily_mean(
+    ds: Union[xr.Dataset, xr.DataArray]
+) -> Union[xr.Dataset, xr.DataArray]:
     ds = spatial_mean(ds)
     return ds.resample(time="1D").mean("time")
