@@ -22,6 +22,7 @@ import re
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from inspect import getmembers, isfunction
+import traceback
 from typing import Any, Dict, List, Tuple
 
 import yaml
@@ -71,7 +72,7 @@ def process_request(
 ) -> Tuple[Dict[Any, Any], Dict[Any, Any]]:
     day = request.get("switch_month_day")
     if day is None:
-        logging.warning(f"No switch month day defined: Default is {SWITCH_MONTH_DAY}")
+        logging.info(f"No switch month day defined: Default is {SWITCH_MONTH_DAY}")
         day = SWITCH_MONTH_DAY
     reduced = {k: v for k, v in request.items() if k in _CATALOG_ALLOWED_KEYS}
     cads_request = {}
@@ -131,18 +132,9 @@ def prepare_run_workdir(
     return run_sub, qar_id, run_n
 
 
-def run(
-    config_file: str,
-    target_dir: str,
+def run_aqc(
+    request: Dict[Any, Any],
 ) -> None:
-    with open(config_file, "r", encoding="utf-8") as f:
-        request = yaml.safe_load(f)
-
-    original_cwd = os.getcwd()
-    # Move into qar subfolder
-    run_sub, qar_id, run_n = prepare_run_workdir(request, target_dir)
-    os.chdir(run_sub)
-
     request, cads_request = process_request(request)
     chunks = request.get("chunks", {"year": 1, "month": 1})
 
@@ -154,19 +146,39 @@ def run(
 
         # TODO: SANITIZE ATTRS BEFORE SAVING
         logging.info(f"Saving metadata for variable '{var}'")
-        with open(run_sub / f"{var}_metadata.yml", "w", encoding="utf-8") as f:
+        with open(f"{var}_metadata.yml", "w", encoding="utf-8") as f:
             f.write(yaml.dump(data.attrs))
 
         for d in request.get("diagnostics"):
             logging.info(f"Processing diagnostic '{d}' for variable '{var}'")
             diag_ds = getattr(diagnostics, d)(data)
 
-            res = run_sub / f"{var}_{d}.png"
-            logging.info(f"Saving diagnostic '{res}'")
+            res = f"{var}_{d}.png"
+            logging.info(f"Saving diagnostic: '{res}'")
             fig = plot.line_plot(diag_ds.squeeze(), var=var, title=d)
             fig.write_image(res)
-
-    # Move back into original folder
-    os.chdir(original_cwd)
-    logging.info(f"QAR ID: {qar_id} - RUN n.: {run_n} finished")
     return
+
+
+def run(
+    config_file: str,
+    target_dir: str,
+) -> None:
+    with open(config_file, "r", encoding="utf-8") as f:
+        request = yaml.safe_load(f)
+    original_cwd = os.getcwd()
+
+    # Move into qar subfolder
+    run_sub, qar_id, run_n = prepare_run_workdir(request, target_dir)
+    os.chdir(run_sub)
+
+    try:
+        run_aqc(request)
+    except Exception as e:
+        logging.error(traceback.format_exc())
+        logging.error(f"QAR ID: {qar_id} - RUN n.: {run_n} failed ")
+    else:
+        logging.info(f"QAR ID: {qar_id} - RUN n.: {run_n} finished")
+    finally:
+        # Move back into original folder
+        os.chdir(original_cwd)

@@ -287,6 +287,7 @@ def download_and_transform_chunk(
     elif open_with == "pandas":
         ds = remote.to_pandas()
     if f is not None:
+        logging.info("Transforming data...")
         ds = f(ds)
     return ds
 
@@ -334,6 +335,7 @@ def download_and_transform(
             collection_id, request=request_chunk, f=f, open_with=open_with
         )
         datasets.append(ds)
+    logging.info("Aggregating data...")
     if open_with == "xarray":
         with dask.config.set({"array.slicing.split_large_chunks": True}):
             ds = xr.merge(datasets, **kwargs)
