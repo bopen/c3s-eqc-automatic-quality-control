@@ -168,7 +168,7 @@ def run(
 
             res = run_sub / f"{var}_{d}.png"
             logging.info(f"Saving diagnostic '{res}'")
-            fig = plot.line_plot(diag_ds.squeeze(), var=var)
+            fig = plot.line_plot(diag_ds.squeeze(), var=var, title=d)
             fig.write_image(res)
 
     # Move back into original folder
