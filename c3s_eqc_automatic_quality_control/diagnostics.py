@@ -28,6 +28,7 @@ def spatial_mean(
 ) -> Union[xr.Dataset, xr.DataArray]:
     """
     Calculate spatial mean of ds with latitude weighting.
+
     Parameters
     ----------
     ds: xr.Dataset or xr.DataArray
