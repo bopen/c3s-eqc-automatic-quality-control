@@ -19,16 +19,22 @@ This module offers available APIs.
 from inspect import getmembers, isfunction
 import logging
 import os
+import pathlib
 import re
 from typing import Dict
-
 import yaml
+
+import cacholote
 
 from . import diagnostics
 from . import download
 from . import plot
 
 
+CACHOLOTE_CONFIGS = {
+    "cache_files_urlpath": os.getenv("CACHOLOTE_CACHE_FILES_URLPATH", ""),
+    "io_delete_original": bool(os.getenv("CACHOLOTE_IO_DELETE_ORIGINAL", "1"))
+}
 CATALOG_ALLOWED_KEYS = (
     'product_type',
     'format',
@@ -38,6 +44,7 @@ CATALOG_ALLOWED_KEYS = (
 SWITCH_MONTH_DAY = 9
 TEMPLATE = """
 qar_id: qar_id
+run_n: 0
 collection_id: reanalysis-era5-single-levels
 product_type:  reanalysis
 format: grib
@@ -52,6 +59,7 @@ diagnostics:
 chunks:
   year: 1
   month: 1
+switch_month_day: 9
 """
 
 
@@ -70,10 +78,17 @@ def process_request(
 ):
     day = request.get("switch_month_day")
     if day is None:
-        logging.info(f"No switch month day defined: Default is {SWITCH_MONTH_DAY}")
+        logging.warning(f"No switch month day defined: Default is {SWITCH_MONTH_DAY}")
         day = SWITCH_MONTH_DAY
     reduced = {k: v for k, v in request.items() if k in CATALOG_ALLOWED_KEYS}
     cads_request = {}
+    for d in request["diagnostics"]:
+        if d not in list_diagnostics():
+            request["diagnostics"].remove(d)
+            logging.warning(
+                f"Skipping diagnostic '{d}' since is not available. "
+                "Run 'eqc diagnostics' to see available diagnostics."
+            )
 
     # Request to CADS are single variable only
     for var in request["variables"]:
@@ -103,59 +118,60 @@ def get_next_run_number(
     return max(runs) + 1
 
 
-def get_qar_params(
-    target_dir: str,
-    qar_id: str
-):
-    qar_folder_path = os.path.join(target_dir, qar_id)
-    qar_run_number = get_next_run_number(qar_folder_path)
-    logging.info(f"Processing QAR ID: {qar_id} - RUN n.: {qar_run_number}")
-    return qar_folder_path, qar_run_number
+def prepare_run_workdir(request: Dict, target_dir: str):
+    qar_id = request.pop("qar_id")
+    run_n = request.pop("run_n", 0)
+    run_sub = pathlib.Path(target_dir) / qar_id / f"run_{run_n}"
+    logging.info(f"Processing QAR ID: {qar_id} - RUN n.: {run_n}")
+    try:
+        os.makedirs(run_sub)
+    except FileExistsError:
+        logging.warning(
+            f"Run '{run_n}' for qar '{qar_id}' already exists. "
+            "Results will be overwritten."
+        )
+    return run_sub, qar_id, run_n
 
 
 def run(
     config_file: str,
     target_dir: str,
 ):
-    original_cwd = os.getcwd()
     with open(config_file, "r", encoding="utf-8") as f:
         request = yaml.safe_load(f)
 
+    original_cwd = os.getcwd()
     # Move into qar subfolder
-    qar_folder_path, qar_run_number = get_qar_params(target_dir, request["qar_id"])
-    run_sub = os.path.join(qar_folder_path, f"run_{qar_run_number}")
-    os.makedirs(run_sub)
+    run_sub, qar_id, run_n = prepare_run_workdir(request, target_dir)
     os.chdir(run_sub)
 
     request, cads_request = process_request(request)
     chunks = request.get("chunks", {"year": 1, "month": 1})
 
     for var, req in cads_request.items():
-        data = download.download_and_transform(
-            collection_id=request["collection_id"],
-            requests=req,
-            chunks=chunks
-        )
+        logging.info(f"Collecting variable '{var}'")
+        with cacholote.config.set(**CACHOLOTE_CONFIGS):
+            data = download.download_and_transform(
+                collection_id=request["collection_id"],
+                requests=req,
+                chunks=chunks
+            )
 
         # TODO: SANITIZE ATTRS BEFORE SAVING
-        with open(os.path.join(run_sub, f"{var}_metadata.yml") , "w", encoding="utf-8") as f:
+        logging.info(f"Saving metadata for variable '{var}'")
+        with open(run_sub / f"{var}_metadata.yml" , "w", encoding="utf-8") as f:
             f.write(yaml.dump(data.attrs))
 
         for d in request.get("diagnostics"):
-            if d in list_diagnostics():
-                fig = plot.line_plot(
-                    getattr(diagnostics, d)(data).squeeze(),
-                    var=var
-                )
-                res = f"{run_sub}/{var}_{d}.png"
-                logging.info(f"Saving result for : {res}")
-                fig.write_image(res)
-            else:
-                logging.warn(
-                    f"Skipping diagnostic '{d}' since is not available. "
-                    "Run 'eqc diagnostics' to see available diagnostics."
-                )
+            logging.info(f"Processing diagnostic '{d}' for variable '{var}'")
+            diag_ds = getattr(diagnostics, d)(data)
+
+            res = run_sub / f"{var}_{d}.png"
+            logging.info(f"Saving diagnostic '{res}'")
+            fig = plot.line_plot(diag_ds.squeeze(), var=var)
+            fig.write_image(res)
 
     # Move back into original folder
     os.chdir(original_cwd)
+    logging.info(f"QAR ID: {qar_id} - RUN n.: {run_n} finished")
     return
