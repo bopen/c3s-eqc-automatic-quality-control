@@ -29,11 +29,6 @@ import yaml
 
 from . import diagnostics, download, plot
 
-_CACHOLOTE_CONFIGS = {
-    "cache_files_urlpath": os.getenv("CACHOLOTE_CACHE_FILES_URLPATH", ""),
-    "io_delete_original": os.getenv("CACHOLOTE_IO_DELETE_ORIGINAL", "True").lower()
-    in ("true", "1", "on"),
-}
 _CATALOG_ALLOWED_KEYS = (
     "product_type",
     "format",
@@ -152,10 +147,9 @@ def run(
 
     for var, req in cads_request.items():
         logging.info(f"Collecting variable '{var}'")
-        with cacholote.config.set(**_CACHOLOTE_CONFIGS):
-            data = download.download_and_transform(
-                collection_id=request["collection_id"], requests=req, chunks=chunks
-            )
+        data = download.download_and_transform(
+            collection_id=request["collection_id"], requests=req, chunks=chunks
+        )
 
         # TODO: SANITIZE ATTRS BEFORE SAVING
         logging.info(f"Saving metadata for variable '{var}'")
