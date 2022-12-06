@@ -32,6 +32,5 @@ dependencies:
   - cads-toolbox
   - cgul
   - emohawk
-  - jupyterlab
   - kaleido
   - plotly
