@@ -6,7 +6,7 @@ This module offers available APIs.
 import logging
 import os
 import pathlib
-import re
+import traceback
 
 # Copyright 2022, European Union.
 #
@@ -22,7 +22,6 @@ import re
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from inspect import getmembers, isfunction
-import traceback
 from typing import Any, Dict, List, Tuple
 
 import yaml
@@ -69,7 +68,7 @@ def list_diagnostics() -> List[str]:
 
 def process_request(
     request: Dict[Any, Any],
-) -> Tuple[Dict[Any, Any], Dict[Any, Any]]:
+) -> Dict[Any, Any]:
     day = request.get("switch_month_day")
     if day is None:
         logging.info(f"No switch month day defined: Default is {SWITCH_MONTH_DAY}")
@@ -97,25 +96,10 @@ def process_request(
                 )
             }
         )
-    return request, cads_request
+    return cads_request
 
 
-def get_next_run_number(
-    qar_folder_path: str,
-) -> int:
-    subdirs = list(os.walk(qar_folder_path))
-    if not subdirs:
-        return 1
-    naming_convention = re.compile("run_(?P<n>[0-9]+)$")
-    runs = [0]
-    for d in subdirs[0][1]:  # list of folders in qar_folder_path
-        match = naming_convention.match(d)
-        if match is not None:
-            runs.append(int(match.group("n")))
-    return max(runs) + 1
-
-
-def prepare_run_workdir(
+def _prepare_run_workdir(
     request: Dict[Any, Any], target_dir: str
 ) -> Tuple[pathlib.Path, str, int]:
     qar_id = request.pop("qar_id")
@@ -135,7 +119,7 @@ def prepare_run_workdir(
 def run_aqc(
     request: Dict[Any, Any],
 ) -> None:
-    request, cads_request = process_request(request)
+    cads_request = process_request(request)
     chunks = request.get("chunks", {"year": 1, "month": 1})
 
     for var, req in cads_request.items():
@@ -149,7 +133,7 @@ def run_aqc(
         with open(f"{var}_metadata.yml", "w", encoding="utf-8") as f:
             f.write(yaml.dump(data.attrs))
 
-        for d in request.get("diagnostics"):
+        for d in request.get("diagnostics", []):
             logging.info(f"Processing diagnostic '{d}' for variable '{var}'")
             diag_ds = getattr(diagnostics, d)(data)
 
@@ -169,12 +153,12 @@ def run(
     original_cwd = os.getcwd()
 
     # Move into qar subfolder
-    run_sub, qar_id, run_n = prepare_run_workdir(request, target_dir)
+    run_sub, qar_id, run_n = _prepare_run_workdir(request, target_dir)
     os.chdir(run_sub)
 
     try:
         run_aqc(request)
-    except Exception as e:
+    except Exception:
         logging.error(traceback.format_exc())
         logging.error(f"QAR ID: {qar_id} - RUN n.: {run_n} failed ")
     else:
