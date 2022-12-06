@@ -33,7 +33,8 @@ from . import plot
 
 CACHOLOTE_CONFIGS = {
     "cache_files_urlpath": os.getenv("CACHOLOTE_CACHE_FILES_URLPATH", ""),
-    "io_delete_original": bool(os.getenv("CACHOLOTE_IO_DELETE_ORIGINAL", "1"))
+    "io_delete_original": os.getenv(
+        "CACHOLOTE_IO_DELETE_ORIGINAL", "True").lower() in ("true", "1", "on")
 }
 CATALOG_ALLOWED_KEYS = (
     'product_type',
