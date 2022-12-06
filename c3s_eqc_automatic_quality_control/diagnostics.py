@@ -24,9 +24,7 @@ import xarray as xr
 
 
 def spatial_mean(
-    ds: Union[xr.Dataset, xr.DataArray],
-    lon: str = "longitude",
-    lat: str = "latitude"
+    ds: Union[xr.Dataset, xr.DataArray], lon: str = "longitude", lat: str = "latitude"
 ) -> Union[xr.Dataset, xr.DataArray]:
     """
     Calculate spatial mean of ds with latitude weighting.

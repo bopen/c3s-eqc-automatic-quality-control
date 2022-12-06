@@ -20,7 +20,6 @@ This module offers plot functions to visualise diagnostic results.
 import plotly.express as px
 import xarray as xr
 
-
 VAR_NAMES_MAP = {
     "2m_temperature": "t2m",
     "skin_temperature": "skt",
@@ -30,7 +29,7 @@ VAR_NAMES_MAP = {
 def line_plot(
     ds: xr.Dataset,
     var: str,
-    title: str = "DAILY MEAN",
+    title: str = "",
 ):
     try:
         fig = px.line(
@@ -42,9 +41,5 @@ def line_plot(
             f"{var} not available for plot. "
             f"Available variables: {list(VAR_NAMES_MAP.keys())}"
         ) from exc
-    fig.update_layout(
-        xaxis_title="time",
-        yaxis_title=var,
-        title=title
-    )
+    fig.update_layout(xaxis_title="time", yaxis_title=var, title=title)
     return fig

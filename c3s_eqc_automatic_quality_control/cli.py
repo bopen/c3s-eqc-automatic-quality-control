@@ -26,7 +26,6 @@ import typer
 
 from . import api
 
-
 logging.basicConfig(
     level="INFO",
     format="%(message)s",

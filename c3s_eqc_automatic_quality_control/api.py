@@ -3,6 +3,11 @@
 This module offers available APIs.
 """
 
+import logging
+import os
+import pathlib
+import re
+
 # Copyright 2022, European Union.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,30 +22,23 @@ This module offers available APIs.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from inspect import getmembers, isfunction
-import logging
-import os
-import pathlib
-import re
 from typing import Dict
-import yaml
 
 import cacholote
+import yaml
 
-from . import diagnostics
-from . import download
-from . import plot
+from . import diagnostics, download, plot
 
-
-CACHOLOTE_CONFIGS = {
+_CACHOLOTE_CONFIGS = {
     "cache_files_urlpath": os.getenv("CACHOLOTE_CACHE_FILES_URLPATH", ""),
-    "io_delete_original": os.getenv(
-        "CACHOLOTE_IO_DELETE_ORIGINAL", "True").lower() in ("true", "1", "on")
+    "io_delete_original": os.getenv("CACHOLOTE_IO_DELETE_ORIGINAL", "True").lower()
+    in ("true", "1", "on"),
 }
-CATALOG_ALLOWED_KEYS = (
-    'product_type',
-    'format',
-    'time',
-    'variable',
+_CATALOG_ALLOWED_KEYS = (
+    "product_type",
+    "format",
+    "time",
+    "variable",
 )
 SWITCH_MONTH_DAY = 9
 TEMPLATE = """
@@ -81,7 +79,7 @@ def process_request(
     if day is None:
         logging.warning(f"No switch month day defined: Default is {SWITCH_MONTH_DAY}")
         day = SWITCH_MONTH_DAY
-    reduced = {k: v for k, v in request.items() if k in CATALOG_ALLOWED_KEYS}
+    reduced = {k: v for k, v in request.items() if k in _CATALOG_ALLOWED_KEYS}
     cads_request = {}
     for d in request["diagnostics"]:
         if d not in list_diagnostics():
@@ -94,12 +92,15 @@ def process_request(
     # Request to CADS are single variable only
     for var in request["variables"]:
         reduced["variable"] = var
-        cads_request.update({
-            var: download.update_request_date(
-                reduced, start=request["start"],
-                stop=request.get("stop"),
-                switch_month_day=day
-            )}
+        cads_request.update(
+            {
+                var: download.update_request_date(
+                    reduced,
+                    start=request["start"],
+                    stop=request.get("stop"),
+                    switch_month_day=day,
+                )
+            }
         )
     return request, cads_request
 
@@ -151,16 +152,14 @@ def run(
 
     for var, req in cads_request.items():
         logging.info(f"Collecting variable '{var}'")
-        with cacholote.config.set(**CACHOLOTE_CONFIGS):
+        with cacholote.config.set(**_CACHOLOTE_CONFIGS):
             data = download.download_and_transform(
-                collection_id=request["collection_id"],
-                requests=req,
-                chunks=chunks
+                collection_id=request["collection_id"], requests=req, chunks=chunks
             )
 
         # TODO: SANITIZE ATTRS BEFORE SAVING
         logging.info(f"Saving metadata for variable '{var}'")
-        with open(run_sub / f"{var}_metadata.yml" , "w", encoding="utf-8") as f:
+        with open(run_sub / f"{var}_metadata.yml", "w", encoding="utf-8") as f:
             f.write(yaml.dump(data.attrs))
 
         for d in request.get("diagnostics"):
