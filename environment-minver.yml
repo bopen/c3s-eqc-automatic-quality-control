@@ -3,7 +3,13 @@ channels:
 - nodefaults
 dependencies:
 - make
-- pandas
 - pytest
 - pytest-cov
 # DO NOT EDIT ABOVE THIS LINE, ADD DEPENDENCIES BELOW
+- dask
+- pandas
+- xarray
+- pip
+- pip:
+  - cacholote
+  - cads-toolbox
