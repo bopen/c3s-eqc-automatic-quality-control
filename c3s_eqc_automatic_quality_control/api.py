@@ -158,7 +158,7 @@ def run(
     try:
         run_aqc(request)
     except Exception:
-        logging.error(f"QAR ID: {qar_id} - RUN n.: {run_n} failed ")
+        logging.exception(f"QAR ID: {qar_id} - RUN n.: {run_n} failed ")
     else:
         logging.info(f"QAR ID: {qar_id} - RUN n.: {run_n} finished")
     finally:
