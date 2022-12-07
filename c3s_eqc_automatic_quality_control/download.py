@@ -28,6 +28,11 @@ import dask
 import pandas as pd
 import xarray as xr
 
+from . import dashboard
+
+
+LOGGER = dashboard.get_logger()
+
 
 def compute_stop_date(switch_month_day: Optional[int] = None) -> pd.Timestamp:
     today = pd.Timestamp.today()
@@ -273,6 +278,7 @@ def download_and_transform_chunk(
         Callable[[xr.Dataset], xr.Dataset] | Callable[[pd.DataFrame], pd.DataFrame]
     ] = None,
     open_with: str = "xarray",
+    logger: logging.Logger = LOGGER
 ) -> xr.Dataset | pd.DataFrame:
     open_with_allowed_values = ("xarray", "pandas")
     if open_with not in ("xarray", "pandas"):
@@ -287,7 +293,7 @@ def download_and_transform_chunk(
     elif open_with == "pandas":
         ds = remote.to_pandas()
     if f is not None:
-        logging.info("Transforming data...")
+        logger.info("Transforming data...")
         ds = f(ds)
     return ds
 
@@ -300,6 +306,7 @@ def download_and_transform(
         Callable[[xr.Dataset], xr.Dataset] | Callable[[pd.DataFrame], pd.DataFrame]
     ] = None,
     open_with: str = "xarray",
+    logger=LOGGER,
     **kwargs: Any,
 ) -> xr.Dataset | pd.DataFrame:
     """
@@ -330,12 +337,12 @@ def download_and_transform(
         request_list.extend(split_request(request, chunks))
     datasets = []
     for n, request_chunk in enumerate(request_list):
-        logging.info(f"Gathering file {n+1} out of {len(request_list)}...")
+        logger.info(f"Gathering file {n+1} out of {len(request_list)}...")
         ds = download_and_transform_chunk(
             collection_id, request=request_chunk, f=f, open_with=open_with
         )
         datasets.append(ds)
-    logging.info("Aggregating data...")
+    logger.info("Aggregating data...")
     if open_with == "xarray":
         with dask.config.set({"array.slicing.split_large_chunks": True}):
             ds = xr.merge(datasets, **kwargs)

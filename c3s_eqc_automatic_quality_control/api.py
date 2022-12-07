@@ -6,6 +6,7 @@ This module offers available APIs.
 import logging
 import os
 import pathlib
+import uuid
 
 # Copyright 2022, European Union.
 #
@@ -25,7 +26,7 @@ from typing import Any, Dict, List, Tuple
 
 import yaml
 
-from . import diagnostics, download, logs, plot
+from . import dashboard, diagnostics, download, plot
 
 _CATALOG_ALLOWED_KEYS = (
     "product_type",
@@ -33,6 +34,7 @@ _CATALOG_ALLOWED_KEYS = (
     "time",
     "variable",
 )
+LOGGER = dashboard.get_logger()
 SWITCH_MONTH_DAY = 9
 TEMPLATE = """
 qar_id: qar_id
@@ -53,7 +55,6 @@ chunks:
   month: 1
 switch_month_day: 9
 """
-LOGGER = logs.get_logger()
 
 
 def show_config_template() -> None:
@@ -101,13 +102,12 @@ def process_request(
 
 
 def _prepare_run_workdir(
-    request: Dict[Any, Any], target_dir: str,
+    target_dir: str,
+    qar_id: str,
+    run_n: str,
     logger: logging.Logger = LOGGER,
 ) -> Tuple[pathlib.Path, str, int]:
-    qar_id = request.pop("qar_id")
-    run_n = request.pop("run_n", 0)
     run_sub = pathlib.Path(target_dir) / qar_id / f"run_{run_n}"
-    logger.info(f"Processing QAR ID: {qar_id} - RUN n.: {run_n}")
     try:
         os.makedirs(run_sub)
     except FileExistsError:
@@ -115,7 +115,7 @@ def _prepare_run_workdir(
             f"Run '{run_n}' for qar '{qar_id}' already exists. "
             "Results will be overwritten."
         )
-    return run_sub, qar_id, run_n
+    return run_sub
 
 
 def run_aqc(
@@ -128,7 +128,8 @@ def run_aqc(
     for var, req in cads_request.items():
         logger.info(f"Collecting variable '{var}'")
         data = download.download_and_transform(
-            collection_id=request["collection_id"], requests=req, chunks=chunks
+            collection_id=request["collection_id"], requests=req, chunks=chunks,
+            logger=logger
         )
 
         # TODO: SANITIZE ATTRS BEFORE SAVING
@@ -153,20 +154,26 @@ def run(
 ) -> None:
     with open(config_file, "r", encoding="utf-8") as f:
         request = yaml.safe_load(f)
-    original_cwd = os.getcwd()
-    logger = logs.get_logger()
-    logger = logs.set_logfile(logger, ".test.log")
 
+    qar_id = request.get("qar_id")
+    run_n = request.get("run_n", 0)
+    run_id = str(uuid.uuid4())[:8]
+    msg = f"QAR ID: {qar_id} - RUN n.: {run_n} - UUID: {run_id}"
+
+    logger = dashboard.get_eqc_run_logger(f"{qar_id}_run_{run_n}_{run_id}")
+    logger.info(f"Processing {msg}")
+
+    original_cwd = os.getcwd()
+    run_sub = _prepare_run_workdir(target_dir, qar_id, run_n, logger)
     # Move into qar subfolder
-    run_sub, qar_id, run_n = _prepare_run_workdir(request, target_dir)
     os.chdir(run_sub)
 
     try:
         run_aqc(request, logger)
     except Exception:
-        logger.exception(f"QAR ID: {qar_id} - RUN n.: {run_n} failed ")
+        logger.exception(f"{msg} - FAILED ")
     else:
-        logger.info(f"QAR ID: {qar_id} - RUN n.: {run_n} finished")
+        logger.info(f"{msg} - DONE")
     finally:
         # Move back into original folder
         os.chdir(original_cwd)
