@@ -6,7 +6,6 @@ This module offers available APIs.
 import logging
 import os
 import pathlib
-import traceback
 
 # Copyright 2022, European Union.
 #
@@ -165,8 +164,7 @@ def run(
     try:
         run_aqc(request, logger)
     except Exception:
-        logger.error(traceback.format_exc())
-        logger.error(f"QAR ID: {qar_id} - RUN n.: {run_n} failed ")
+        logger.exception(f"QAR ID: {qar_id} - RUN n.: {run_n} failed ")
     else:
         logger.info(f"QAR ID: {qar_id} - RUN n.: {run_n} finished")
     finally:
