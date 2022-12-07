@@ -17,27 +17,14 @@ This module manages the command line interfaces.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
 import os
 
 import rich
-import rich.logging
 import typer
 
 from . import api
 
-logging.basicConfig(
-    level="INFO",
-    format="%(message)s",
-    handlers=[
-        rich.logging.RichHandler(
-            show_time=False,
-            show_path=False,
-            rich_tracebacks=True,
-            markup=True,
-        )
-    ],
-)
+
 
 app = typer.Typer(
     no_args_is_help=True,
