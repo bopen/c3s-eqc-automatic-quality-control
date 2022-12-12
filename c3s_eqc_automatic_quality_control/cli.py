@@ -38,7 +38,7 @@ def eqc() -> None:
 
 @app.command(name="diagnostics")
 def show_diagnostics() -> None:
-    """Show available diagnostic function names."""
+    """Show available diagnostics names."""
     table = rich.table.Table("Available diagnostics")
     for d in api.list_diagnostics():
         table.add_row(d)
@@ -47,7 +47,7 @@ def show_diagnostics() -> None:
 
 @app.command(name="show-config-template")
 def show_config_template() -> None:
-    """Show template configuration file."""
+    """Show a template configuration file."""
     rich.print(api.TEMPLATE)
 
 
@@ -56,6 +56,7 @@ def run(
     config_file: str,
     target_dir: str = typer.Option(os.getcwd(), "--target-dir", "-t"),
 ) -> None:
+    """Run automatic quality checks and populate QAR."""
     api.run(config_file, target_dir)
 
 
