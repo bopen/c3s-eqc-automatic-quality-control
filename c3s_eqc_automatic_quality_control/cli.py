@@ -18,13 +18,18 @@ This module manages the command line interfaces.
 # limitations under the License.
 
 import os
+from operator import itemgetter
 
 import rich
 import typer
 
-from . import api
+from . import dashboard, runner
 
-
+STATUSES = {
+    "DONE": "[green]DONE[/]",
+    "FAILED": "[red]FAILED[/]",
+    "PROCESSING": "PROCESSING",
+}
 
 app = typer.Typer(
     no_args_is_help=True,
@@ -40,7 +45,7 @@ def eqc() -> None:
 def show_diagnostics() -> None:
     """Show available diagnostics names."""
     table = rich.table.Table("Available diagnostics")
-    for d in api.list_diagnostics():
+    for d in runner.list_diagnostics():
         table.add_row(d)
     rich.print(table)
 
@@ -48,7 +53,7 @@ def show_diagnostics() -> None:
 @app.command(name="show-config-template")
 def show_config_template() -> None:
     """Show a template configuration file."""
-    rich.print(api.TEMPLATE)
+    rich.print(runner.TEMPLATE)
 
 
 @app.command()
@@ -57,7 +62,17 @@ def run(
     target_dir: str = typer.Option(os.getcwd(), "--target-dir", "-t"),
 ) -> None:
     """Run automatic quality checks and populate QAR."""
-    api.run(config_file, target_dir)
+    runner.run(config_file, target_dir)
+
+
+@app.command(name="dashboard")
+def list() -> None:
+    """Show status of launched processes."""
+    table = rich.table.Table("QAR ID", "RUN N.", "START", "STATUS")
+    sorted_qars = sorted(dashboard.list_qars().items(), key=itemgetter(0))
+    for (qar, run_n), info in dict(sorted_qars).items():
+        table.add_row(qar, run_n, info["start"], STATUSES[info["status"]])
+    rich.print(table)
 
 
 if __name__ == "__main__":

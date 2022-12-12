@@ -30,7 +30,6 @@ import xarray as xr
 
 from . import dashboard
 
-
 LOGGER = dashboard.get_logger()
 
 
@@ -278,7 +277,7 @@ def download_and_transform_chunk(
         Callable[[xr.Dataset], xr.Dataset] | Callable[[pd.DataFrame], pd.DataFrame]
     ] = None,
     open_with: str = "xarray",
-    logger: logging.Logger = LOGGER
+    logger: logging.Logger = LOGGER,
 ) -> xr.Dataset | pd.DataFrame:
     open_with_allowed_values = ("xarray", "pandas")
     if open_with not in ("xarray", "pandas"):
@@ -306,7 +305,7 @@ def download_and_transform(
         Callable[[xr.Dataset], xr.Dataset] | Callable[[pd.DataFrame], pd.DataFrame]
     ] = None,
     open_with: str = "xarray",
-    logger=LOGGER,
+    logger: logging.Logger = LOGGER,
     **kwargs: Any,
 ) -> xr.Dataset | pd.DataFrame:
     """

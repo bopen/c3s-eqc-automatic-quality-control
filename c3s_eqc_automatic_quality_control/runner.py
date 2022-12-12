@@ -106,7 +106,7 @@ def _prepare_run_workdir(
     qar_id: str,
     run_n: str,
     logger: logging.Logger = LOGGER,
-) -> Tuple[pathlib.Path, str, int]:
+) -> pathlib.Path:
     run_sub = pathlib.Path(target_dir) / qar_id / f"run_{run_n}"
     try:
         os.makedirs(run_sub)
@@ -158,10 +158,10 @@ def run(
     qar_id = request.get("qar_id")
     run_n = request.get("run_n", 0)
     run_id = str(uuid.uuid4())[:8]
-    msg = f"QAR ID: {qar_id} - RUN n.: {run_n} - UUID: {run_id}"
+    msg = f"QAR ID: {qar_id} - RUN n.: {run_n}"
 
     logger = dashboard.get_eqc_run_logger(f"{qar_id}_run_{run_n}_{run_id}")
-    logger.info(f"Processing {msg}")
+    logger.info(f"{msg} - PROCESSING")
 
     original_cwd = os.getcwd()
     run_sub = _prepare_run_workdir(target_dir, qar_id, run_n, logger)
@@ -171,7 +171,7 @@ def run(
     try:
         run_aqc(request, logger)
     except Exception:
-        logger.exception(f"{msg} - FAILED ")
+        logger.exception(f"{msg} - FAILED")
     else:
         logger.info(f"{msg} - DONE")
     finally:

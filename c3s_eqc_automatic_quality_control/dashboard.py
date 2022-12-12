@@ -17,16 +17,19 @@ This module manages the package logging.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import datetime
 import logging
 import pathlib
+import re
 from typing import Any, Dict
-import datetime
 
 import rich.logging
 
-
-LOG_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
-LOG_TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
+LOG_FMT = "%(asctime)s - %(levelname)s - %(message)s"
+LOG_TIME_FMT = "%Y-%m-%d %H:%M:%S"
+FILENAME_TIME_FMT = "%Y%m%d%H%M%S"
+MSG_REGEX = "(?:.+) - QAR ID: (?P<qar_id>.+) - RUN n.: (?P<run_n>.+) - (?P<status>.+)"
+FILENAME_REGEX = "eqc_(?P<start>[0-9]{14})"
 
 logging.basicConfig(
     format="%(message)s",
@@ -47,15 +50,12 @@ def get_logger(name: str = "eqc", level: int = logging.INFO) -> logging.Logger:
     return logger
 
 
-def set_logfile(logger: logging.Logger, logfilepath: str) -> logging.Logger:
+def set_logfile(logger: logging.Logger, logfilepath: pathlib.Path) -> logging.Logger:
     for handler in logger.handlers:
         if isinstance(handler, logging.FileHandler):
             logger.removeHandler(handler)
     file_handler = logging.FileHandler(logfilepath)
-    formatter = logging.Formatter(
-        fmt=LOG_FORMAT,
-        datefmt=LOG_TIME_FORMAT
-    )
+    formatter = logging.Formatter(fmt=LOG_FMT, datefmt=LOG_TIME_FMT)
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
     return logger
@@ -68,9 +68,37 @@ def ensure_log_dir() -> pathlib.Path:
     return log_dir
 
 
-def get_eqc_run_logger(name) -> logging.Logger:
-    now = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+def get_eqc_run_logger(name: str) -> logging.Logger:
+    now = datetime.datetime.now().strftime(FILENAME_TIME_FMT)
     log_dir = ensure_log_dir()
     logger = get_logger(f"{name}")
-    logger = set_logfile(logger, log_dir / f"aqc_{now}_{name}.log")
+    logger = set_logfile(logger, log_dir / f"eqc_{now}_{name}.log")
     return logger
+
+
+def list_qars() -> Dict[Any, Any]:
+    log_dir = ensure_log_dir()
+    status: Dict[Any, Any] = {}
+    for log in log_dir.glob("eqc*.log"):
+        with open(log, "r", encoding="utf-8") as f:
+            # get only matched lines
+            for match in map(re.compile(MSG_REGEX).match, f.readlines()):
+                if match is not None:
+                    info = match.groupdict()
+            # start datetime from filename
+            # update status for each qar_id, run_n if run_n is newer
+            start = re.compile(FILENAME_REGEX).match(log.name)
+            if start is not None:
+                s = start.group("start")
+                info.update(
+                    {
+                        "start": datetime.datetime.strptime(
+                            s, FILENAME_TIME_FMT
+                        ).strftime(LOG_TIME_FMT)
+                    }
+                )
+            qar_id = info.pop("qar_id")
+            run_n = info.pop("run_n")
+            if (qar_id, run_n) not in status or s > status[(qar_id, run_n)]["start"]:
+                status[(qar_id, run_n)] = info
+    return status
