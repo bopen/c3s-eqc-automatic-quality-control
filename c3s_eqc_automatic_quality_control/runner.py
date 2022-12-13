@@ -22,7 +22,7 @@ import uuid
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from inspect import getmembers, isfunction
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List
 
 import yaml
 
@@ -128,8 +128,10 @@ def run_aqc(
     for var, req in cads_request.items():
         logger.info(f"Collecting variable '{var}'")
         data = download.download_and_transform(
-            collection_id=request["collection_id"], requests=req, chunks=chunks,
-            logger=logger
+            collection_id=request["collection_id"],
+            requests=req,
+            chunks=chunks,
+            logger=logger,
         )
 
         # TODO: SANITIZE ATTRS BEFORE SAVING
