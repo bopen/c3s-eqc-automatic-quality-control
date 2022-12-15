@@ -189,20 +189,18 @@ def ensure_list(obj: Any) -> List[Any]:
         return [obj]
 
 
-def check_non_empty(request: Dict[str, Any]) -> bool:
-    non_empty = False
+def check_non_empty_date(request: Dict[str, Any]) -> bool:
+    ymd = ("year", "month", "day")
+    if not set(ymd) <= set(request):
+        # Not a date request
+        return True
 
-    years = ensure_list(request["year"])
-    months = ensure_list(request["month"])
-    days = ensure_list(request["day"])
-    date = itertools.product(years, months, days)
-
+    date = itertools.product(*(ensure_list(request[key]) for key in ymd))
     for year, month, day in date:
         n_days = calendar.monthrange(int(year), int(month))[1]
         if int(day) <= n_days:
-            non_empty = True
-            break
-    return non_empty
+            return True
+    return False
 
 
 def build_chunks(
@@ -241,27 +239,27 @@ def split_request(
     -------
     xr.Dataset: list of requests
     """
-    if len(chunks) == 0:
-        requests = [request.copy()]
-    else:
-        requests = []
-        list_values = list(
-            itertools.product(
-                *[
-                    build_chunks(request[par], chunk_size)
-                    for par, chunk_size in chunks.items()
-                ]
-            )
+    if not chunks:
+        return [request.copy()]
+
+    requests = []
+    list_values = list(
+        itertools.product(
+            *[
+                build_chunks(request[par], chunk_size)
+                for par, chunk_size in chunks.items()
+            ]
         )
-        for values in list_values:
-            out_request = request.copy()
-            for parameter, value in zip(chunks, values):
-                out_request[parameter] = value
+    )
+    for values in list_values:
+        out_request = request.copy()
+        for parameter, value in zip(chunks, values):
+            out_request[parameter] = value
 
-            if not check_non_empty(out_request):
-                continue
+        if not check_non_empty_date(out_request):
+            continue
 
-            requests.append(out_request)
+        requests.append(out_request)
     return requests
 
 
@@ -275,10 +273,9 @@ def download_and_transform_chunk(
     open_with: str = "xarray",
 ) -> xr.Dataset | pd.DataFrame:
     open_with_allowed_values = ("xarray", "pandas")
-    if open_with not in ("xarray", "pandas"):
+    if open_with not in open_with_allowed_values:
         raise ValueError(
-            f"{open_with} is not a valid value, 'open_with' can take on "
-            f"one of the following values {open_with_allowed_values}"
+            f"{open_with=} is not a valid value. Allowed values: {open_with_allowed_values!r}"
         )
 
     remote = cads_toolbox.catalogue.retrieve(collection_id, request)

@@ -59,7 +59,7 @@ def test_build_chunks() -> None:
     assert res[-1] == [9, 10]
 
 
-def test_check_non_empty() -> None:
+def test_check_non_empty_date() -> None:
 
     request = {
         "year": "2021",
@@ -67,7 +67,7 @@ def test_check_non_empty() -> None:
         "day": ["30", "31"],
     }
 
-    assert download.check_non_empty(request)
+    assert download.check_non_empty_date(request)
 
     request = {
         "year": "2021",
@@ -75,7 +75,7 @@ def test_check_non_empty() -> None:
         "day": "30",
     }
 
-    assert download.check_non_empty(request)
+    assert download.check_non_empty_date(request)
 
     request = {
         "year": "2021",
@@ -83,7 +83,7 @@ def test_check_non_empty() -> None:
         "day": "31",
     }
 
-    assert not download.check_non_empty(request)
+    assert not download.check_non_empty_date(request)
 
     request = {
         "year": "2021",
@@ -91,7 +91,7 @@ def test_check_non_empty() -> None:
         "day": ["30", "31"],
     }
 
-    assert not download.check_non_empty(request)
+    assert not download.check_non_empty_date(request)
 
 
 def test_floor_to_month() -> None:
