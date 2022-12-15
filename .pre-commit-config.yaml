@@ -50,6 +50,7 @@ repos:
   hooks:
   - id: nbqa-isort
   - id: nbqa-black
+  - id: nbqa-flake8
   - id: nbqa
     entry: nbqa mdformat
     name: nbqa-mdformat
