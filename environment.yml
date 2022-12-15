@@ -21,6 +21,8 @@ dependencies:
 - matplotlib
 - netCDF4
 - pandas
+- pydantic
+- python-dotenv
 - rich
 - sqlalchemy
 - typer
