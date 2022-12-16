@@ -66,23 +66,15 @@ def run(
 
 
 @app.command(name="dashboard")
-def list(
+def dasboard(
     qar_id: str = typer.Option(None, "--qar-id", "-q"),
     status: str = typer.Option(None, "--status", "-s"),
 ) -> None:
     """Show status of launched processes."""
     table = rich.table.Table("QAR ID", "RUN N.", "START", "STATUS")
-    sorted_qars = dict(sorted(dashboard.list_qars().items(), key=itemgetter(0)))
-    if qar_id is not None:
-        sorted_qars = {k: v for k, v in sorted_qars.items() if k[0] == qar_id}
-    if status is not None:
-        if status.upper() not in STATUSES:
-            raise ValueError(
-                f"Status {status} not valid. Available status: {[s.lower() for s in STATUSES]}"
-            )
-        sorted_qars = {
-            k: v for k, v in sorted_qars.items() if v["status"] == status.upper()
-        }
+    sorted_qars = dict(
+        sorted(dashboard.list_qars(qar_id, status).items(), key=itemgetter(0))
+    )
     for (qar, run_n), info in sorted_qars.items():
         table.add_row(qar, run_n, info["start"], STATUSES[info["status"]])
     rich.print(table)

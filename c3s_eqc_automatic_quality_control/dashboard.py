@@ -21,7 +21,8 @@ import datetime
 import logging
 import pathlib
 import re
-from typing import Any, Dict
+from operator import itemgetter
+from typing import Any, Dict, List, Tuple
 
 import rich.logging
 
@@ -29,7 +30,7 @@ LOG_FMT = "%(asctime)s - %(levelname)s - %(message)s"
 LOG_TIME_FMT = "%Y-%m-%d %H:%M:%S"
 FILENAME_TIME_FMT = "%Y%m%d%H%M%S"
 MSG_REGEX = "(?:.+) - QAR ID: (?P<qar_id>.+) - RUN n.: (?P<run_n>.+) - (?P<status>.+)"
-FILENAME_REGEX = "eqc_(?P<start>[0-9]{14})"
+FILENAME_REGEX = "eqc_(?P<start>[0-9]{14})_(?P<qar_id>.+)_run_(?P<run_n>.+)_(?:.+).log"
 
 logging.basicConfig(
     format="%(message)s",
@@ -76,29 +77,61 @@ def get_eqc_run_logger(name: str) -> logging.Logger:
     return logger
 
 
-def list_qars() -> Dict[Any, Any]:
+def get_most_recent_log(info: List[Dict[Any, Any]]) -> Dict[Any, Any]:
+    # return most recent info base on datetime in logfile name
+    sorted_info = sorted(info, key=itemgetter("start"))
+    # Use ISO format for date and time
+    sorted_info[-1].update(
+        {
+            "start": datetime.datetime.strptime(
+                sorted_info[-1]["start"], FILENAME_TIME_FMT
+            ).strftime(LOG_TIME_FMT)
+        }
+    )
+    return sorted_info[-1]
+
+
+def update_status_from_logfile(
+    logfile: pathlib.Path, info: Dict[Any, Any]
+) -> Dict[Any, Any]:
+    with open(logfile, "r", encoding="utf-8") as f:
+        # get only last matched line
+        for match in map(re.compile(MSG_REGEX).match, reversed(f.readlines())):
+            if match is not None:
+                info.update({"status": match["status"]})
+                break
+        else:
+            raise RuntimeError("No status found in logfile {log}")
+    return info
+
+
+def list_qars(
+    qar_id: str | None = None,
+    status: str | None = None,
+) -> Dict[Any, Any]:
     log_dir = ensure_log_dir()
-    status: Dict[Any, Any] = {}
-    for log in log_dir.glob("eqc*.log"):
-        with open(log, "r", encoding="utf-8") as f:
-            # get only matched lines
-            for match in map(re.compile(MSG_REGEX).match, f.readlines()):
-                if match is not None:
-                    info = match.groupdict()
-            # start datetime from filename
-            # update status for each qar_id, run_n if run_n is newer
-            start = re.compile(FILENAME_REGEX).match(log.name)
-            if start is not None:
-                s = start.group("start")
-                info.update(
-                    {
-                        "start": datetime.datetime.strptime(
-                            s, FILENAME_TIME_FMT
-                        ).strftime(LOG_TIME_FMT)
-                    }
-                )
-            qar_id = info.pop("qar_id")
-            run_n = info.pop("run_n")
-            if (qar_id, run_n) not in status or s > status[(qar_id, run_n)]["start"]:
-                status[(qar_id, run_n)] = info
-    return status
+    qar_map: Dict[Tuple[str, str], List[Dict[Any, Any]]] = {}
+    search = "eqc*.log"
+    # filter by qar_id
+    if qar_id is not None:
+        search = f"eqc*{qar_id}*.log"
+
+    for log in log_dir.glob(search):
+        filename_info = re.compile(FILENAME_REGEX).match(log.name)
+        if filename_info is None:
+            continue
+        qar_id = filename_info["qar_id"]
+        run_n = filename_info["run_n"]
+        info = {"start": filename_info["start"], "logfile": str(log)}
+        info = update_status_from_logfile(log, info)
+        qar_map[(qar_id, run_n)] = qar_map.get((qar_id, run_n), []) + [info]
+
+    latest_status = {k: get_most_recent_log(v) for k, v in qar_map.items()}
+
+    # Filter by status
+    if status is not None:
+        latest_status = {
+            k: v for k, v in latest_status.items() if v["status"] == status.upper()
+        }
+
+    return latest_status
