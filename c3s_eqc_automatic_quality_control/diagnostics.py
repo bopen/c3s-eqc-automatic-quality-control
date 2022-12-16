@@ -17,15 +17,13 @@ This module gathers available diagnostics.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Union
-
 import numpy as np
 import xarray as xr
 
 
 def spatial_mean(
-    ds: Union[xr.Dataset, xr.DataArray], lon: str = "longitude", lat: str = "latitude"
-) -> Union[xr.Dataset, xr.DataArray]:
+    ds: xr.Dataset | xr.DataArray, lon: str = "longitude", lat: str = "latitude"
+) -> xr.Dataset | xr.DataArray:
     """
     Calculate spatial mean of ds with latitude weighting.
 
@@ -46,8 +44,6 @@ def spatial_mean(
     return (ds * weights).sum(dim=[lon, lat])  # type: ignore
 
 
-def spatial_daily_mean(
-    ds: Union[xr.Dataset, xr.DataArray]
-) -> Union[xr.Dataset, xr.DataArray]:
+def spatial_daily_mean(ds: xr.Dataset | xr.DataArray) -> xr.Dataset | xr.DataArray:
     ds = spatial_mean(ds)
     return ds.resample(time="1D").mean("time")

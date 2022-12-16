@@ -44,6 +44,9 @@ def test_split_request() -> None:
     requests = download.split_request(request, {"month": 1, "year": 1})
     assert len(requests) == 4 * 12
 
+    requests = download.split_request(request, 1)
+    assert len(requests) == 3 * 4 * 12
+
 
 def test_build_chunks() -> None:
 

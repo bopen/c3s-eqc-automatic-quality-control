@@ -21,8 +21,10 @@ dependencies:
 - matplotlib
 - netCDF4
 - pandas
+- plotly
 - pydantic
 - python-dotenv
+- pyyaml
 - rich
 - sqlalchemy
 - typer
@@ -30,10 +32,8 @@ dependencies:
 - xarray
 - pip
 - pip:
-  - cacholote
-  - cads-toolbox
+  - git+https://github.com/ecmwf-projects/cacholote.git@locker-contextvars
+  - git+https://github.com/ecmwf-projects/cads-toolbox.git@single-zipfile-patch
   - cgul
   - emohawk
   - kaleido
-  - plotly
-  - pyyaml
