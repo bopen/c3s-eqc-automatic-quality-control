@@ -274,7 +274,7 @@ def split_request(
 def download_and_transform_chunk(
     collection_id: str,
     request: dict[str, Any],
-    f: None
+    func: None
     | (
         Callable[[xr.Dataset], xr.Dataset] | Callable[[pd.DataFrame], pd.DataFrame]
     ) = None,
@@ -288,12 +288,12 @@ def download_and_transform_chunk(
 
     remote = cads_toolbox.catalogue.retrieve(collection_id, request)
     if open_with == "xarray":
-        ds = remote.to_xarray()
+        ds = remote.to_xarray(harmonise=True)
     elif open_with == "pandas":
         ds = remote.to_pandas()
-    if f is not None:
+    if func is not None:
         logging.info("Transforming data...")
-        ds = f(ds)
+        ds = func(ds)
     return ds
 
 
@@ -301,7 +301,7 @@ def download_and_transform(
     collection_id: str,
     requests: list[dict[str, Any]] | dict[str, Any],
     chunks: int | dict[str, int] = {},
-    f: None
+    func: None
     | (
         Callable[[xr.Dataset], xr.Dataset] | Callable[[pd.DataFrame], pd.DataFrame]
     ) = None,
@@ -320,7 +320,7 @@ def download_and_transform(
     chunks: int, dict
         Integer: chunk_size for all parameteres
         Dictionary: {parameter_name: chunk_size}
-    f: callable
+    func: callable
         Function to apply to each single chunk
     open_with: str
         Backend used for opening the data file, valid values: 'xarray', or 'pandas'
@@ -339,7 +339,7 @@ def download_and_transform(
     for n, request_chunk in enumerate(request_list):
         logging.info(f"Gathering file {n+1} out of {len(request_list)}...")
         ds = download_and_transform_chunk(
-            collection_id, request=request_chunk, f=f, open_with=open_with
+            collection_id, request=request_chunk, func=func, open_with=open_with
         )
         datasets.append(ds)
     logging.info("Aggregating data...")

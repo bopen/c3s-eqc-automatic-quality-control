@@ -66,7 +66,7 @@ def shadowed_std(
 
         rgb = list(rgb)
         dark = f"rgba{tuple(rgb + [1])}"
-        light = f"rgba{tuple(rgb + [.1])}"
+        light = f"rgba{tuple(rgb + [.15])}"
         data.append(
             go.Scatter(
                 name=da_mean.attrs.get("long_name", ""),
