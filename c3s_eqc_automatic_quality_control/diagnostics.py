@@ -20,9 +20,6 @@ This module gathers available diagnostics.
 import numpy as np
 import xarray as xr
 
-LONS = ("longitude", "lon")
-LATS = ("latitude", "lat")
-
 
 def spatial_weights(
     obj: xr.Dataset | xr.DataArray, lon: str = "longitude", lat: str = "latitude"
