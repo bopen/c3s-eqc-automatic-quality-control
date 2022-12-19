@@ -73,7 +73,6 @@ def process_request(
 ) -> Dict[Any, Any]:
     day = request.get("switch_month_day")
     if day is None:
-        logger.info(f"No switch month day defined: Default is {SWITCH_MONTH_DAY}")
         day = SWITCH_MONTH_DAY
     reduced = {k: v for k, v in request.items() if k in _CATALOG_ALLOWED_KEYS}
     cads_request = {}
@@ -107,7 +106,8 @@ def _prepare_run_workdir(
     run_n: str,
     logger: logging.Logger = LOGGER,
 ) -> pathlib.Path:
-    run_sub = pathlib.Path(target_dir) / qar_id / f"run_{run_n}"
+    run_sub = pathlib.Path(target_dir) / f"{qar_id}" / f"run_{run_n}"
+    logger.info(f"QAR workdir: {run_sub}")
     try:
         os.makedirs(run_sub)
     except FileExistsError:

@@ -29,7 +29,7 @@ import rich.logging
 LOG_FMT = "%(asctime)s - %(levelname)s - %(message)s"
 LOG_TIME_FMT = "%Y-%m-%d %H:%M:%S"
 FILENAME_TIME_FMT = "%Y%m%d%H%M%S"
-MSG_REGEX = "(?:.+) - QAR ID: (?P<qar_id>.+) - RUN n.: (?P<run_n>.+) - (?P<status>.+)"
+MSG_REGEX = "(?P<logtime>.+) - (?:.+) - QAR ID: (?P<qar_id>.+) - RUN n.: (?P<run_n>.+) - (?P<status>.+)"
 FILENAME_REGEX = "eqc_(?P<start>[0-9]{14})_(?P<qar_id>.+)_run_(?P<run_n>.+)_(?:.+).log"
 
 logging.basicConfig(
@@ -91,23 +91,26 @@ def get_most_recent_log(info: List[Dict[Any, Any]]) -> Dict[Any, Any]:
     return sorted_info[-1]
 
 
-def update_status_from_logfile(
-    logfile: pathlib.Path, info: Dict[Any, Any]
-) -> Dict[Any, Any]:
+def update_from_logfile(logfile: pathlib.Path, info: Dict[Any, Any]) -> Dict[Any, Any]:
     with open(logfile, "r", encoding="utf-8") as f:
         # get only last matched line
-        for match in map(re.compile(MSG_REGEX).match, reversed(f.readlines())):
-            if match is not None:
-                info.update({"status": match["status"]})
+        lines = f.readlines()
+        # Workdir path
+        info.update({"workdir": lines[1].rsplit("QAR workdir:", 1)[-1]})
+        for match in map(re.compile(MSG_REGEX).match, reversed(lines)):
+            if match is None:
+                continue
+            info.update({"status": match["status"]})
+            if match["status"] in ("DONE", "FAILED"):
+                info.update({"stop": match["logtime"]})
                 break
         else:
-            raise RuntimeError("No status found in logfile {log}")
+            raise RuntimeError(f"No status found in logfile {logfile}")
     return info
 
 
 def list_qars(
-    qar_id: str | None = None,
-    status: str | None = None,
+    qar_id: str | None = None, status: str | None = None, limit: int | None = 20
 ) -> Dict[Any, Any]:
     log_dir = ensure_log_dir()
     qar_map: Dict[Tuple[str, str], List[Dict[Any, Any]]] = {}
@@ -116,22 +119,24 @@ def list_qars(
     if qar_id is not None:
         search = f"eqc*{qar_id}*.log"
 
-    for log in log_dir.glob(search):
+    for log in sorted(log_dir.glob(search)):
         filename_info = re.compile(FILENAME_REGEX).match(log.name)
         if filename_info is None:
             continue
         qar_id = filename_info["qar_id"]
         run_n = filename_info["run_n"]
-        info = {"start": filename_info["start"], "logfile": str(log)}
-        info = update_status_from_logfile(log, info)
+        info = {"start": filename_info["start"], "logfile": str(log), "stop": ""}
+        info = update_from_logfile(log, info)
         qar_map[(qar_id, run_n)] = qar_map.get((qar_id, run_n), []) + [info]
 
     latest_status = {k: get_most_recent_log(v) for k, v in qar_map.items()}
+
+    # filter first {limit} results
+    latest_status = dict(sorted(latest_status.items(), key=itemgetter(0))[:limit])
 
     # Filter by status
     if status is not None:
         latest_status = {
             k: v for k, v in latest_status.items() if v["status"] == status.upper()
         }
-
     return latest_status

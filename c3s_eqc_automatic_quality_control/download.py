@@ -292,7 +292,6 @@ def download_and_transform_chunk(
     elif open_with == "pandas":
         ds = remote.to_pandas()
     if f is not None:
-        logger.info("Transforming data...")
         ds = f(ds)
     return ds
 

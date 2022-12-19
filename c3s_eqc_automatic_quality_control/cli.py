@@ -18,7 +18,6 @@ This module manages the command line interfaces.
 # limitations under the License.
 
 import os
-from operator import itemgetter
 
 import rich
 import typer
@@ -69,14 +68,19 @@ def run(
 def dasboard(
     qar_id: str = typer.Option(None, "--qar-id", "-q"),
     status: str = typer.Option(None, "--status", "-s"),
+    limit: int = typer.Option(20, "--limit", "-l"),
 ) -> None:
     """Show status of launched processes."""
-    table = rich.table.Table("QAR ID", "RUN N.", "START", "STATUS")
-    sorted_qars = dict(
-        sorted(dashboard.list_qars(qar_id, status).items(), key=itemgetter(0))
-    )
-    for (qar, run_n), info in sorted_qars.items():
-        table.add_row(qar, run_n, info["start"], STATUSES[info["status"]])
+    table = rich.table.Table("QAR ID", "RUN N.", "STATUS", "START", "STOP", "WORKDIR")
+    for (qar, run_n), info in dashboard.list_qars(qar_id, status, limit).items():
+        table.add_row(
+            qar,
+            run_n,
+            STATUSES[info["status"]],
+            info["start"],
+            info["stop"],
+            info["workdir"],
+        )
     rich.print(table)
 
 
