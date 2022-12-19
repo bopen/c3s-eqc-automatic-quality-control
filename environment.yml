@@ -32,8 +32,7 @@ dependencies:
 - xarray
 - pip
 - pip:
-  - git+https://github.com/ecmwf-projects/cacholote.git@locker-contextvars
+  - git+https://github.com/ecmwf-projects/cacholote.git
   - git+https://github.com/ecmwf-projects/cads-toolbox.git
-  - cgul
   - emohawk
   - kaleido

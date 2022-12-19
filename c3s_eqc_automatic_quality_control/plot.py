@@ -82,8 +82,7 @@ def shadowed_std(
                 x=da_mean["time"],
                 y=da_mean + da_std,
                 mode="lines",
-                marker=dict(color="#444"),
-                line=dict(width=0),
+                line=dict(width=0.25, color=dark),
                 showlegend=False,
             )
         )
@@ -92,8 +91,7 @@ def shadowed_std(
                 name="Lower Bound",
                 x=da_mean["time"],
                 y=da_mean - da_std,
-                marker=dict(color="#444"),
-                line=dict(width=0),
+                line=dict(width=0.25, color=dark),
                 mode="lines",
                 fillcolor=light,
                 fill="tonexty",

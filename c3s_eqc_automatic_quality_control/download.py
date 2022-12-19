@@ -223,8 +223,7 @@ def build_chunks(
 
 
 def split_request(
-    request: dict[str, Any],
-    chunks: int | dict[str, int] = {},
+    request: dict[str, Any], chunks: dict[str, int] = {}, split_all: bool = False
 ) -> list[dict[str, Any]]:
     """
     Split the input request in smaller request defined by the chunks.
@@ -233,21 +232,22 @@ def split_request(
     ----------
     request: dict
         Parameters of the request
-    chunks: int, dict
-        Integer: chunk_size for all parameteres
+    chunks: dict
         Dictionary: {parameter_name: chunk_size}
-
+    split_all: bool
+        Split all parameters. Mutually exclusive with chunks
 
     Returns
     -------
     xr.Dataset: list of requests
     """
+    if chunks and split_all:
+        raise ValueError("`chunks` and `split_all` are mutually exclusive")
+    if split_all:
+        chunks = {k: 1 for k, v in request.items() if isinstance(v, (tuple, list, set))}
+
     if not chunks:
         return [request]
-    if isinstance(chunks, int):
-        chunks = {
-            k: chunks for k, v in request.items() if isinstance(v, (tuple, list, set))
-        }
 
     requests = []
     list_values = list(
@@ -300,7 +300,8 @@ def download_and_transform_chunk(
 def download_and_transform(
     collection_id: str,
     requests: list[dict[str, Any]] | dict[str, Any],
-    chunks: int | dict[str, int] = {},
+    chunks: dict[str, int] = {},
+    split_all: bool = False,
     func: None
     | (
         Callable[[xr.Dataset], xr.Dataset] | Callable[[pd.DataFrame], pd.DataFrame]
@@ -317,9 +318,10 @@ def download_and_transform(
         ID of the dataset.
     requests: list of dict or dict
         Parameters of the requests
-    chunks: int, dict
-        Integer: chunk_size for all parameteres
+    chunks: dict
         Dictionary: {parameter_name: chunk_size}
+    split_all: bool
+        Split all parameters. Mutually exclusive with chunks
     func: callable
         Function to apply to each single chunk
     open_with: str
@@ -334,7 +336,7 @@ def download_and_transform(
     request_list = []
 
     for request in ensure_list(requests):
-        request_list.extend(split_request(request, chunks))
+        request_list.extend(split_request(request, chunks, split_all))
     datasets = []
     for n, request_chunk in enumerate(request_list):
         logging.info(f"Gathering file {n+1} out of {len(request_list)}...")

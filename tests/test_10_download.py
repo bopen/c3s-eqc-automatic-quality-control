@@ -1,4 +1,5 @@
 import pandas as pd
+import pytest
 
 from c3s_eqc_automatic_quality_control import download
 
@@ -44,8 +45,13 @@ def test_split_request() -> None:
     requests = download.split_request(request, {"month": 1, "year": 1})
     assert len(requests) == 4 * 12
 
-    requests = download.split_request(request, 1)
+    requests = download.split_request(request, split_all=True)
     assert len(requests) == 3 * 4 * 12
+
+    with pytest.raises(
+        ValueError, match="`chunks` and `split_all` are mutually exclusive"
+    ):
+        download.split_request(request, {"month": 1}, split_all=True)
 
 
 def test_build_chunks() -> None:
