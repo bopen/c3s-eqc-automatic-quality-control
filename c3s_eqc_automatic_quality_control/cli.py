@@ -17,27 +17,19 @@ This module manages the command line interfaces.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
 import os
+from operator import itemgetter
 
 import rich
-import rich.logging
 import typer
 
-from . import api
+from . import dashboard, runner
 
-logging.basicConfig(
-    level="INFO",
-    format="%(message)s",
-    handlers=[
-        rich.logging.RichHandler(
-            show_time=False,
-            show_path=False,
-            rich_tracebacks=True,
-            markup=True,
-        )
-    ],
-)
+STATUSES = {
+    "DONE": "[green]DONE[/]",
+    "FAILED": "[red]FAILED[/]",
+    "PROCESSING": "PROCESSING",
+}
 
 app = typer.Typer(
     no_args_is_help=True,
@@ -51,17 +43,17 @@ def eqc() -> None:
 
 @app.command(name="diagnostics")
 def show_diagnostics() -> None:
-    """Show available diagnostic function names."""
+    """Show available diagnostics names."""
     table = rich.table.Table("Available diagnostics")
-    for d in api.list_diagnostics():
+    for d in runner.list_diagnostics():
         table.add_row(d)
     rich.print(table)
 
 
 @app.command(name="show-config-template")
 def show_config_template() -> None:
-    """Show template configuration file."""
-    rich.print(api.TEMPLATE)
+    """Show a template configuration file."""
+    rich.print(runner.TEMPLATE)
 
 
 @app.command()
@@ -69,7 +61,23 @@ def run(
     config_file: str,
     target_dir: str = typer.Option(os.getcwd(), "--target-dir", "-t"),
 ) -> None:
-    api.run(config_file, target_dir)
+    """Run automatic quality checks and populate QAR."""
+    runner.run(config_file, target_dir)
+
+
+@app.command(name="dashboard")
+def dasboard(
+    qar_id: str = typer.Option(None, "--qar-id", "-q"),
+    status: str = typer.Option(None, "--status", "-s"),
+) -> None:
+    """Show status of launched processes."""
+    table = rich.table.Table("QAR ID", "RUN N.", "START", "STATUS")
+    sorted_qars = dict(
+        sorted(dashboard.list_qars(qar_id, status).items(), key=itemgetter(0))
+    )
+    for (qar, run_n), info in sorted_qars.items():
+        table.add_row(qar, run_n, info["start"], STATUSES[info["status"]])
+    rich.print(table)
 
 
 if __name__ == "__main__":
