@@ -9,6 +9,7 @@ dependencies:
 - dask
 - pandas
 - xarray
+- rich
 - pip
 - pip:
   - cacholote

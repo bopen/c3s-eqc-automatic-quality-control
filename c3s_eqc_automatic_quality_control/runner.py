@@ -6,6 +6,7 @@ This module offers available APIs.
 import logging
 import os
 import pathlib
+import uuid
 
 # Copyright 2022, European Union.
 #
@@ -25,7 +26,7 @@ from typing import Any
 
 import yaml
 
-from . import diagnostics, download, plot
+from . import dashboard, diagnostics, download, plot
 
 _CATALOG_ALLOWED_KEYS = (
     "product_type",
@@ -33,6 +34,7 @@ _CATALOG_ALLOWED_KEYS = (
     "time",
     "variable",
 )
+LOGGER = dashboard.get_logger()
 SWITCH_MONTH_DAY = 9
 TEMPLATE = """
 qar_id: qar_id
@@ -67,17 +69,18 @@ def list_diagnostics() -> list[str]:
 
 def process_request(
     request: dict[Any, Any],
+    logger: logging.Logger = LOGGER,
 ) -> dict[Any, Any]:
     day = request.get("switch_month_day")
     if day is None:
-        logging.info(f"No switch month day defined: Default is {SWITCH_MONTH_DAY}")
+        logger.info(f"No switch month day defined: Default is {SWITCH_MONTH_DAY}")
         day = SWITCH_MONTH_DAY
     reduced = {k: v for k, v in request.items() if k in _CATALOG_ALLOWED_KEYS}
     cads_request = {}
     for d in request["diagnostics"]:
         if d not in list_diagnostics():
             request["diagnostics"].remove(d)
-            logging.warning(
+            logger.warning(
                 f"Skipping diagnostic '{d}' since is not available. "
                 "Run 'eqc diagnostics' to see available diagnostics."
             )
@@ -99,45 +102,49 @@ def process_request(
 
 
 def _prepare_run_workdir(
-    request: dict[Any, Any], target_dir: str
-) -> tuple[pathlib.Path, str, int]:
-    qar_id = request.pop("qar_id")
-    run_n = request.pop("run_n", 0)
+    target_dir: str,
+    qar_id: str,
+    run_n: str,
+    logger: logging.Logger = LOGGER,
+) -> pathlib.Path:
     run_sub = pathlib.Path(target_dir) / qar_id / f"run_{run_n}"
-    logging.info(f"Processing QAR ID: {qar_id} - RUN n.: {run_n}")
     try:
         os.makedirs(run_sub)
     except FileExistsError:
-        logging.warning(
+        logger.warning(
             f"Run '{run_n}' for qar '{qar_id}' already exists. "
             "Results will be overwritten."
         )
-    return run_sub, qar_id, run_n
+    return run_sub
 
 
 def run_aqc(
     request: dict[Any, Any],
+    logger: logging.Logger = LOGGER,
 ) -> None:
     cads_request = process_request(request)
     chunks = request.get("chunks", {"year": 1, "month": 1})
 
     for var, req in cads_request.items():
-        logging.info(f"Collecting variable '{var}'")
+        logger.info(f"Collecting variable '{var}'")
         data = download.download_and_transform(
-            collection_id=request["collection_id"], requests=req, chunks=chunks
+            collection_id=request["collection_id"],
+            requests=req,
+            chunks=chunks,
+            logger=logger,
         )
 
         # TODO: SANITIZE ATTRS BEFORE SAVING
-        logging.info(f"Saving metadata for variable '{var}'")
+        logger.info(f"Saving metadata for variable '{var}'")
         with open(f"{var}_metadata.yml", "w", encoding="utf-8") as f:
             f.write(yaml.dump(data.attrs))
 
         for d in request.get("diagnostics", []):
-            logging.info(f"Processing diagnostic '{d}' for variable '{var}'")
+            logger.info(f"Processing diagnostic '{d}' for variable '{var}'")
             diag_ds = getattr(diagnostics, d)(data)
 
             res = f"{var}_{d}.png"
-            logging.info(f"Saving diagnostic: '{res}'")
+            logger.info(f"Saving diagnostic: '{res}'")
             fig = plot.line_plot(diag_ds.squeeze(), var=var, title=d)
             fig.write_image(res)
     return
@@ -149,18 +156,26 @@ def run(
 ) -> None:
     with open(config_file, encoding="utf-8") as f:
         request = yaml.safe_load(f)
-    original_cwd = os.getcwd()
 
+    qar_id = request.get("qar_id")
+    run_n = request.get("run_n", 0)
+    run_id = str(uuid.uuid4())[:8]
+    msg = f"QAR ID: {qar_id} - RUN n.: {run_n}"
+
+    logger = dashboard.get_eqc_run_logger(f"{qar_id}_run_{run_n}_{run_id}")
+    logger.info(f"{msg} - PROCESSING")
+
+    original_cwd = os.getcwd()
+    run_sub = _prepare_run_workdir(target_dir, qar_id, run_n, logger)
     # Move into qar subfolder
-    run_sub, qar_id, run_n = _prepare_run_workdir(request, target_dir)
     os.chdir(run_sub)
 
     try:
-        run_aqc(request)
+        run_aqc(request, logger)
     except Exception:
-        logging.exception(f"QAR ID: {qar_id} - RUN n.: {run_n} failed ")
+        logger.exception(f"{msg} - FAILED")
     else:
-        logging.info(f"QAR ID: {qar_id} - RUN n.: {run_n} finished")
+        logger.info(f"{msg} - DONE")
     finally:
         # Move back into original folder
         os.chdir(original_cwd)
