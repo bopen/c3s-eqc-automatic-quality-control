@@ -47,7 +47,7 @@ def line_plot(
     return fig
 
 
-def shadowed_std(
+def shaded_std(
     ds_mean: xr.Dataset | xr.DataArray,
     ds_std: xr.Dataset | xr.DataArray,
     vars: list[str],
