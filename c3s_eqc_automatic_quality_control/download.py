@@ -20,7 +20,8 @@ This module manages the execution of the quality control.
 import calendar
 import itertools
 import logging
-from typing import Any, Callable, Dict, List, Optional
+from collections.abc import Callable
+from typing import Any
 
 import cacholote
 import cads_toolbox
@@ -33,7 +34,7 @@ from . import dashboard
 LOGGER = dashboard.get_logger()
 
 
-def compute_stop_date(switch_month_day: Optional[int] = None) -> pd.Timestamp:
+def compute_stop_date(switch_month_day: int | None = None) -> pd.Timestamp:
     today = pd.Timestamp.today()
     if switch_month_day is None:
         switch_month_day = 9
@@ -66,7 +67,7 @@ def floor_to_month(period: pd.Period, month: int = 1) -> pd.Period:
 
 def extract_leading_months(
     start: pd.Period, stop: pd.Period
-) -> List[Dict[str, List[int] | int]]:
+) -> list[dict[str, list[int] | int]]:
 
     time_ranges = []
     if start.month > 1 and (start.year < stop.year or stop.month == 12):
@@ -86,7 +87,7 @@ def extract_leading_months(
 
 def extract_trailing_months(
     start: pd.Period, stop: pd.Period
-) -> List[Dict[str, List[int] | int]]:
+) -> list[dict[str, list[int] | int]]:
 
     time_ranges = []
     if not stop.month == 12:
@@ -106,7 +107,7 @@ def extract_trailing_months(
 
 def extract_years(
     start: pd.Timestamp, stop: pd.Timestamp
-) -> List[Dict[str, List[int]]]:
+) -> list[dict[str, list[int]]]:
 
     start = ceil_to_month(start, month=1)
     stop = floor_to_month(stop, month=12)
@@ -125,9 +126,9 @@ def extract_years(
 
 def compute_request_date(
     start: pd.Period,
-    stop: Optional[pd.Period] = None,
-    switch_month_day: Optional[int] = None,
-) -> List[Dict[str, List[int] | int]]:
+    stop: pd.Period | None = None,
+    switch_month_day: int | None = None,
+) -> list[dict[str, list[int] | int]]:
     if not stop:
         stop = compute_stop_date(switch_month_day)
 
@@ -140,11 +141,11 @@ def compute_request_date(
 
 
 def update_request_date(
-    request: Dict[str, Any],
+    request: dict[str, Any],
     start: str | pd.Period,
-    stop: Optional[str | pd.Period] = None,
-    switch_month_day: Optional[int] = None,
-) -> Dict[str, Any] | List[Dict[str, Any]]:
+    stop: str | pd.Period | None = None,
+    switch_month_day: int | None = None,
+) -> dict[str, Any] | list[dict[str, Any]]:
     """
     Return the requests defined by 'request' for the period defined by start and stop.
 
@@ -185,7 +186,7 @@ def update_request_date(
     return requests
 
 
-def ensure_list(obj: Any) -> List[Any]:
+def ensure_list(obj: Any) -> list[Any]:
 
     if isinstance(obj, (list, tuple)):
         return list(obj)
@@ -193,33 +194,31 @@ def ensure_list(obj: Any) -> List[Any]:
         return [obj]
 
 
-def check_non_empty(request: Dict[str, Any]) -> bool:
-    non_empty = False
+def check_non_empty_date(request: dict[str, Any]) -> bool:
+    ymd = ("year", "month", "day")
+    if not set(ymd) <= set(request):
+        # Not a date request
+        return True
 
-    years = ensure_list(request["year"])
-    months = ensure_list(request["month"])
-    days = ensure_list(request["day"])
-    date = itertools.product(years, months, days)
-
+    date = itertools.product(*(ensure_list(request[key]) for key in ymd))
     for year, month, day in date:
         n_days = calendar.monthrange(int(year), int(month))[1]
         if int(day) <= n_days:
-            non_empty = True
-            break
-    return non_empty
+            return True
+    return False
 
 
 def build_chunks(
-    values: List[Any] | Any,
+    values: list[Any] | Any,
     chunks_size: int,
-) -> List[List[Any]] | List[Any]:
+) -> list[list[Any]] | list[Any]:
 
     values = ensure_list(values)
     values.copy()
     if chunks_size == 1:
         return values
     else:
-        chunks_list: List[List[Any]] = []
+        chunks_list: list[list[Any]] = []
         for k, value in enumerate(values):
             if k % chunks_size == 0:
                 chunks_list.append([])
@@ -228,9 +227,8 @@ def build_chunks(
 
 
 def split_request(
-    request: Dict[str, Any],
-    chunks: Dict[str, int] = {},
-) -> List[Dict[str, Any]]:
+    request: dict[str, Any], chunks: dict[str, int] = {}, split_all: bool = False
+) -> list[dict[str, Any]]:
     """
     Split the input request in smaller request defined by the chunks.
 
@@ -239,71 +237,80 @@ def split_request(
     request: dict
         Parameters of the request
     chunks: dict
-        Dictionary {parameter_name: chunk_size}
+        Dictionary: {parameter_name: chunk_size}
+    split_all: bool
+        Split all parameters. Mutually exclusive with chunks
 
     Returns
     -------
     xr.Dataset: list of requests
     """
-    if len(chunks) == 0:
-        requests = [request.copy()]
-    else:
-        requests = []
-        list_values = list(
-            itertools.product(
-                *[
-                    build_chunks(request[par], chunk_size)
-                    for par, chunk_size in chunks.items()
-                ]
-            )
+    if chunks and split_all:
+        raise ValueError("`chunks` and `split_all` are mutually exclusive")
+    if split_all:
+        chunks = {k: 1 for k, v in request.items() if isinstance(v, (tuple, list, set))}
+
+    if not chunks:
+        return [request]
+
+    requests = []
+    list_values = list(
+        itertools.product(
+            *[
+                build_chunks(request[par], chunk_size)
+                for par, chunk_size in chunks.items()
+            ]
         )
-        for values in list_values:
-            out_request = request.copy()
-            for parameter, value in zip(chunks, values):
-                out_request[parameter] = value
+    )
+    for values in list_values:
+        out_request = request.copy()
+        for parameter, value in zip(chunks, values):
+            out_request[parameter] = value
 
-            if not check_non_empty(out_request):
-                continue
+        if not check_non_empty_date(out_request):
+            continue
 
-            requests.append(out_request)
+        requests.append(out_request)
     return requests
 
 
 @cacholote.cacheable
 def download_and_transform_chunk(
     collection_id: str,
-    request: Dict[str, Any],
-    f: Optional[
+    request: dict[str, Any],
+    func: None
+    | (
         Callable[[xr.Dataset], xr.Dataset] | Callable[[pd.DataFrame], pd.DataFrame]
-    ] = None,
+    ) = None,
     open_with: str = "xarray",
     logger: logging.Logger = LOGGER,
 ) -> xr.Dataset | pd.DataFrame:
     open_with_allowed_values = ("xarray", "pandas")
-    if open_with not in ("xarray", "pandas"):
+    if open_with not in open_with_allowed_values:
         raise ValueError(
-            f"{open_with} is not a valid value, 'open_with' can take on "
-            f"one of the following values {open_with_allowed_values}"
+            f"{open_with=} is not a valid value. Allowed values: {open_with_allowed_values!r}"
         )
 
     remote = cads_toolbox.catalogue.retrieve(collection_id, request)
     if open_with == "xarray":
-        ds = remote.to_xarray()
+        ds = remote.to_xarray(harmonise=True)
     elif open_with == "pandas":
         ds = remote.to_pandas()
-    if f is not None:
+    if func is not None:
         logger.info("Transforming data...")
-        ds = f(ds)
+        ds = func(ds)
     return ds
 
 
 def download_and_transform(
     collection_id: str,
-    requests: List[Dict[str, Any]] | Dict[str, Any],
-    chunks: Dict[str, int] = {},
-    f: Optional[
+    requests: list[dict[str, Any]] | dict[str, Any],
+    chunks: dict[str, int] = {},
+    split_all: bool = False,
+    func: None
+    | (
         Callable[[xr.Dataset], xr.Dataset] | Callable[[pd.DataFrame], pd.DataFrame]
-    ] = None,
+    ) = None,
     open_with: str = "xarray",
     logger: logging.Logger = LOGGER,
     **kwargs: Any,
@@ -318,8 +325,10 @@ def download_and_transform(
     requests: list of dict or dict
         Parameters of the requests
     chunks: dict
-        Dictionary {parameter_name: chunk_size}
-    f: callable
+        Dictionary: {parameter_name: chunk_size}
+    split_all: bool
+        Split all parameters. Mutually exclusive with chunks
+    func: callable
         Function to apply to each single chunk
     open_with: str
         Backend used for opening the data file, valid values: 'xarray', or 'pandas'
@@ -333,12 +342,12 @@ def download_and_transform(
     request_list = []
 
     for request in ensure_list(requests):
-        request_list.extend(split_request(request, chunks))
+        request_list.extend(split_request(request, chunks, split_all))
     datasets = []
     for n, request_chunk in enumerate(request_list):
         logger.info(f"Gathering file {n+1} out of {len(request_list)}...")
         ds = download_and_transform_chunk(
-            collection_id, request=request_chunk, f=f, open_with=open_with
+            collection_id, request=request_chunk, func=func, open_with=open_with
         )
         datasets.append(ds)
     logger.info("Aggregating data...")

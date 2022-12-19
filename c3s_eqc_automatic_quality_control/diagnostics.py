@@ -17,37 +17,61 @@ This module gathers available diagnostics.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Union
-
 import numpy as np
 import xarray as xr
 
 
-def spatial_mean(
-    ds: Union[xr.Dataset, xr.DataArray], lon: str = "longitude", lat: str = "latitude"
-) -> Union[xr.Dataset, xr.DataArray]:
+def spatial_weights(
+    obj: xr.Dataset | xr.DataArray, lon: str = "longitude", lat: str = "latitude"
+) -> xr.DataArray:
+    cos = np.cos(np.deg2rad(obj[lat]))
+    weights: xr.DataArray = cos / (cos.sum(lat) * len(obj[lon]))
+    return weights
+
+
+def spatial_weighted_mean(
+    obj: xr.Dataset | xr.DataArray, lon: str = "longitude", lat: str = "latitude"
+) -> xr.Dataset | xr.DataArray:
     """
     Calculate spatial mean of ds with latitude weighting.
 
     Parameters
     ----------
-    ds: xr.Dataset or xr.DataArray
+    obj: xr.Dataset or xr.DataArray
         Input data on which to apply the spatial mean
     lon: str, optional
         Name of longitude coordinate
     lat: str, optional
         Name of latitude coordinate
+
     Returns
     -------
-    ds spatially mean
+    reduced object
     """
-    cos = np.cos(np.deg2rad(ds[lat]))
-    weights = cos / (cos.sum(lat) * len(ds[lon]))
-    return (ds * weights).sum(dim=[lon, lat])  # type: ignore
+    with xr.set_options(keep_attrs=True):  # type: ignore[no-untyped-call]
+        weights = spatial_weights(obj, lon, lat)
+        return obj.weighted(weights).mean((lon, lat))
 
 
-def spatial_daily_mean(
-    ds: Union[xr.Dataset, xr.DataArray]
-) -> Union[xr.Dataset, xr.DataArray]:
-    ds = spatial_mean(ds)
-    return ds.resample(time="1D").mean("time")
+def spatial_weighted_std(
+    obj: xr.Dataset | xr.DataArray, lon: str = "longitude", lat: str = "latitude"
+) -> xr.Dataset | xr.DataArray:
+    """
+    Calculate spatial std of ds with latitude weighting.
+
+    Parameters
+    ----------
+    obj: xr.Dataset or xr.DataArray
+        Input data on which to apply the spatial mean
+    lon: str, optional
+        Name of longitude coordinate
+    lat: str, optional
+        Name of latitude coordinate
+
+    Returns
+    -------
+    reduced object
+    """
+    with xr.set_options(keep_attrs=True):  # type: ignore[no-untyped-call]
+        weights = spatial_weights(obj, lon, lat)
+        return obj.weighted(weights).std((lon, lat))

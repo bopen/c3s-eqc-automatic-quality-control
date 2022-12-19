@@ -1,4 +1,5 @@
 import pandas as pd
+import pytest
 
 from c3s_eqc_automatic_quality_control import download
 
@@ -44,6 +45,14 @@ def test_split_request() -> None:
     requests = download.split_request(request, {"month": 1, "year": 1})
     assert len(requests) == 4 * 12
 
+    requests = download.split_request(request, split_all=True)
+    assert len(requests) == 3 * 4 * 12
+
+    with pytest.raises(
+        ValueError, match="`chunks` and `split_all` are mutually exclusive"
+    ):
+        download.split_request(request, {"month": 1}, split_all=True)
+
 
 def test_build_chunks() -> None:
 
@@ -59,7 +68,7 @@ def test_build_chunks() -> None:
     assert res[-1] == [9, 10]
 
 
-def test_check_non_empty() -> None:
+def test_check_non_empty_date() -> None:
 
     request = {
         "year": "2021",
@@ -67,7 +76,7 @@ def test_check_non_empty() -> None:
         "day": ["30", "31"],
     }
 
-    assert download.check_non_empty(request)
+    assert download.check_non_empty_date(request)
 
     request = {
         "year": "2021",
@@ -75,7 +84,7 @@ def test_check_non_empty() -> None:
         "day": "30",
     }
 
-    assert download.check_non_empty(request)
+    assert download.check_non_empty_date(request)
 
     request = {
         "year": "2021",
@@ -83,7 +92,7 @@ def test_check_non_empty() -> None:
         "day": "31",
     }
 
-    assert not download.check_non_empty(request)
+    assert not download.check_non_empty_date(request)
 
     request = {
         "year": "2021",
@@ -91,7 +100,7 @@ def test_check_non_empty() -> None:
         "day": ["30", "31"],
     }
 
-    assert not download.check_non_empty(request)
+    assert not download.check_non_empty_date(request)
 
 
 def test_floor_to_month() -> None:

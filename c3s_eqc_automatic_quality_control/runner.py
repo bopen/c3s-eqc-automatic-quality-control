@@ -22,7 +22,7 @@ import uuid
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from inspect import getmembers, isfunction
-from typing import Any, Dict, List
+from typing import Any
 
 import yaml
 
@@ -62,15 +62,15 @@ def show_config_template() -> None:
     print(f"{TEMPLATE}")
 
 
-def list_diagnostics() -> List[str]:
+def list_diagnostics() -> list[str]:
     """Return available diagnostic function names."""
     return [f[0] for f in getmembers(diagnostics, isfunction)]
 
 
 def process_request(
-    request: Dict[Any, Any],
+    request: dict[Any, Any],
     logger: logging.Logger = LOGGER,
-) -> Dict[Any, Any]:
+) -> dict[Any, Any]:
     day = request.get("switch_month_day")
     if day is None:
         logger.info(f"No switch month day defined: Default is {SWITCH_MONTH_DAY}")
@@ -119,7 +119,7 @@ def _prepare_run_workdir(
 
 
 def run_aqc(
-    request: Dict[Any, Any],
+    request: dict[Any, Any],
     logger: logging.Logger = LOGGER,
 ) -> None:
     cads_request = process_request(request)
@@ -154,7 +154,7 @@ def run(
     config_file: str,
     target_dir: str,
 ) -> None:
-    with open(config_file, "r", encoding="utf-8") as f:
+    with open(config_file, encoding="utf-8") as f:
         request = yaml.safe_load(f)
 
     qar_id = request.get("qar_id")
