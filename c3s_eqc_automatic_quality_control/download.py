@@ -345,7 +345,10 @@ def download_and_transform(
     for n, request_chunk in enumerate(request_list):
         logger.info(f"Gathering file {n+1} out of {len(request_list)}...")
         ds = download_and_transform_chunk(
-            collection_id, request=request_chunk, transform_func=transform_func, open_with=open_with
+            collection_id,
+            request=request_chunk,
+            transform_func=transform_func,
+            open_with=open_with,
         )
         datasets.append(ds)
     logger.info("Aggregating data...")

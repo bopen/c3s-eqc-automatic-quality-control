@@ -64,7 +64,9 @@ def show_config_template() -> None:
 
 def list_diagnostics() -> list[str]:
     """Return available diagnostic function names."""
-    return [f[0] for f in getmembers(diagnostics, isfunction) if not f[0].startswith("_")]
+    return [
+        f[0] for f in getmembers(diagnostics, isfunction) if not f[0].startswith("_")
+    ]
 
 
 def process_request(

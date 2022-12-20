@@ -30,7 +30,9 @@ LOG_FMT = "%(asctime)s - %(levelname)s - %(message)s"
 LOG_TIME_FMT = "%Y-%m-%d %H:%M:%S"
 FILENAME_TIME_FMT = "%Y%m%d%H%M%S"
 MSG_REGEX = "(?P<logtime>.+) - (?:.+) - QAR ID: (?P<qar_id>.+) - RUN n.: (?P<run_n>.+) - (?P<status>.+)"
-FILENAME_REGEX = "eqc_(?P<start>[0-9]{14})_qar_(?P<qar_id>.+)_run_(?P<run_n>.+)_(?:.+).log"
+FILENAME_REGEX = (
+    "eqc_(?P<start>[0-9]{14})_qar_(?P<qar_id>.+)_run_(?P<run_n>.+)_(?:.+).log"
+)
 
 logging.basicConfig(
     format="%(message)s",
