@@ -22,7 +22,7 @@ import logging
 import pathlib
 import re
 from operator import itemgetter
-from typing import Any
+from typing import Any, Dict
 
 import rich.logging
 
@@ -30,7 +30,7 @@ LOG_FMT = "%(asctime)s - %(levelname)s - %(message)s"
 LOG_TIME_FMT = "%Y-%m-%d %H:%M:%S"
 FILENAME_TIME_FMT = "%Y%m%d%H%M%S"
 MSG_REGEX = "(?P<logtime>.+) - (?:.+) - QAR ID: (?P<qar_id>.+) - RUN n.: (?P<run_n>.+) - (?P<status>.+)"
-FILENAME_REGEX = "eqc_(?P<start>[0-9]{14})_(?P<qar_id>.+)_run_(?P<run_n>.+)_(?:.+).log"
+FILENAME_REGEX = "eqc_(?P<start>[0-9]{14})_qar_(?P<qar_id>.+)_run_(?P<run_n>.+)_(?:.+).log"
 
 logging.basicConfig(
     format="%(message)s",
@@ -96,8 +96,8 @@ def update_from_logfile(logfile: pathlib.Path, info: Dict[Any, Any]) -> Dict[Any
         # get only last matched line
         lines = f.readlines()
         # Workdir path
-        info.update({"workdir": lines[1].rsplit("QAR workdir:", 1)[-1]})
-        for match in map(re.compile(MSG_REGEX).match, reversed(lines)):
+        info.update({"workdir": lines[1].rsplit("QAR workdir: ", 1)[-1]})
+        for match in map(re.compile(MSG_REGEX).match, list(reversed(lines))):
             if match is None:
                 continue
             info.update({"status": match["status"]})

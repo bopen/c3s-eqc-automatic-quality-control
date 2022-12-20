@@ -22,7 +22,7 @@ import uuid
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from inspect import getmembers, isfunction
-from typing import Any
+from typing import Any, Tuple
 
 import yaml
 
@@ -37,8 +37,8 @@ _CATALOG_ALLOWED_KEYS = (
 LOGGER = dashboard.get_logger()
 SWITCH_MONTH_DAY = 9
 TEMPLATE = """
-qar_id: qar_id
-run_n: 0
+qar_id: qar_identifier
+run_n: run_number
 collection_id: reanalysis-era5-single-levels
 product_type:  reanalysis
 format: grib
@@ -46,8 +46,8 @@ time: [06, 18]
 variables:
   - 2m_temperature
   - skin_temperature
-start: 2021-06
-stop: 2021-07
+start: YYYY-MM
+stop:
 diagnostics:
   - spatial_daily_mean
 chunks:
@@ -64,25 +64,27 @@ def show_config_template() -> None:
 
 def list_diagnostics() -> list[str]:
     """Return available diagnostic function names."""
-    return [f[0] for f in getmembers(diagnostics, isfunction)]
+    return [f[0] for f in getmembers(diagnostics, isfunction) if not f[0].startswith("_")]
 
 
 def process_request(
     request: dict[Any, Any],
     logger: logging.Logger = LOGGER,
-) -> dict[Any, Any]:
+) -> Tuple[dict[Any, Any], list[str]]:
     day = request.get("switch_month_day")
     if day is None:
         day = SWITCH_MONTH_DAY
     reduced = {k: v for k, v in request.items() if k in _CATALOG_ALLOWED_KEYS}
     cads_request = {}
-    for d in request["diagnostics"]:
-        if d not in list_diagnostics():
-            request["diagnostics"].remove(d)
+    diagnos = []
+    for diagnostic in request["diagnostics"]:
+        if diagnostic not in list_diagnostics():
             logger.warning(
-                f"Skipping diagnostic '{d}' since is not available. "
+                f"Skipping diagnostic '{diagnostic}' since is not available. "
                 "Run 'eqc diagnostics' to see available diagnostics."
             )
+        else:
+            diagnos.append(diagnostic)
 
     # Request to CADS are single variable only
     for var in request["variables"]:
@@ -97,7 +99,7 @@ def process_request(
                 )
             }
         )
-    return cads_request
+    return cads_request, diagnos
 
 
 def _prepare_run_workdir(
@@ -106,7 +108,7 @@ def _prepare_run_workdir(
     run_n: str,
     logger: logging.Logger = LOGGER,
 ) -> pathlib.Path:
-    run_sub = pathlib.Path(target_dir) / f"{qar_id}" / f"run_{run_n}"
+    run_sub = pathlib.Path(target_dir) / f"qar_{qar_id}" / f"run_{run_n}"
     logger.info(f"QAR workdir: {run_sub}")
     try:
         os.makedirs(run_sub)
@@ -122,7 +124,7 @@ def run_aqc(
     request: dict[Any, Any],
     logger: logging.Logger = LOGGER,
 ) -> None:
-    cads_request = process_request(request)
+    cads_request, diagnos = process_request(request)
     chunks = request.get("chunks", {"year": 1, "month": 1})
 
     for var, req in cads_request.items():
@@ -139,7 +141,7 @@ def run_aqc(
         with open(f"{var}_metadata.yml", "w", encoding="utf-8") as f:
             f.write(yaml.dump(data.attrs))
 
-        for d in request.get("diagnostics", []):
+        for d in diagnos:
             logger.info(f"Processing diagnostic '{d}' for variable '{var}'")
             diag_ds = getattr(diagnostics, d)(data)
 
@@ -162,7 +164,7 @@ def run(
     run_id = str(uuid.uuid4())[:8]
     msg = f"QAR ID: {qar_id} - RUN n.: {run_n}"
 
-    logger = dashboard.get_eqc_run_logger(f"{qar_id}_run_{run_n}_{run_id}")
+    logger = dashboard.get_eqc_run_logger(f"qar_{qar_id}_run_{run_n}_{run_id}")
     logger.info(f"{msg} - PROCESSING")
 
     original_cwd = os.getcwd()

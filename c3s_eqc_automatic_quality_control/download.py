@@ -278,12 +278,11 @@ def split_request(
 def download_and_transform_chunk(
     collection_id: str,
     request: dict[str, Any],
-    func: None
+    transform_func: None
     | (
         Callable[[xr.Dataset], xr.Dataset] | Callable[[pd.DataFrame], pd.DataFrame]
     ) = None,
     open_with: str = "xarray",
-    logger: logging.Logger = LOGGER,
 ) -> xr.Dataset | pd.DataFrame:
     open_with_allowed_values = ("xarray", "pandas")
     if open_with not in open_with_allowed_values:
@@ -296,8 +295,8 @@ def download_and_transform_chunk(
         ds = remote.to_xarray(harmonise=True)
     elif open_with == "pandas":
         ds = remote.to_pandas()
-    if func is not None:
-        ds = func(ds)
+    if transform_func is not None:
+        ds = transform_func(ds)
     return ds
 
 
@@ -306,7 +305,7 @@ def download_and_transform(
     requests: list[dict[str, Any]] | dict[str, Any],
     chunks: dict[str, int] = {},
     split_all: bool = False,
-    func: None
+    transform_func: None
     | (
         Callable[[xr.Dataset], xr.Dataset] | Callable[[pd.DataFrame], pd.DataFrame]
     ) = None,
@@ -346,7 +345,7 @@ def download_and_transform(
     for n, request_chunk in enumerate(request_list):
         logger.info(f"Gathering file {n+1} out of {len(request_list)}...")
         ds = download_and_transform_chunk(
-            collection_id, request=request_chunk, func=func, open_with=open_with
+            collection_id, request=request_chunk, transform_func=transform_func, open_with=open_with
         )
         datasets.append(ds)
     logger.info("Aggregating data...")
