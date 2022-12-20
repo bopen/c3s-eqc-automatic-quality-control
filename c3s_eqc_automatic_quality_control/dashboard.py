@@ -22,7 +22,7 @@ import logging
 import pathlib
 import re
 from operator import itemgetter
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 import rich.logging
 
@@ -77,7 +77,7 @@ def get_eqc_run_logger(name: str) -> logging.Logger:
     return logger
 
 
-def get_most_recent_log(info: List[Dict[Any, Any]]) -> Dict[Any, Any]:
+def get_most_recent_log(info: list[dict[Any, Any]]) -> dict[Any, Any]:
     # return most recent info base on datetime in logfile name
     sorted_info = sorted(info, key=itemgetter("start"))
     # Use ISO format for date and time
@@ -113,7 +113,7 @@ def list_qars(
     qar_id: str | None = None, status: str | None = None, limit: int | None = 20
 ) -> Dict[Any, Any]:
     log_dir = ensure_log_dir()
-    qar_map: Dict[Tuple[str, str], List[Dict[Any, Any]]] = {}
+    qar_map: dict[tuple[str, str], list[dict[Any, Any]]] = {}
     search = "eqc*.log"
     # filter by qar_id
     if qar_id is not None:
