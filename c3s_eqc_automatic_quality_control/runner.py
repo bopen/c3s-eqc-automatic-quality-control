@@ -72,7 +72,7 @@ def list_diagnostics() -> list[str]:
 def process_request(
     request: dict[Any, Any],
     logger: logging.Logger = LOGGER,
-) -> Tuple[dict[Any, Any], list[str]]:
+) -> tuple[dict[Any, Any], list[str]]:
     day = request.get("switch_month_day")
     if day is None:
         day = SWITCH_MONTH_DAY
