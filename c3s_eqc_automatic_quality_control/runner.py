@@ -22,7 +22,7 @@ import uuid
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from inspect import getmembers, isfunction
-from typing import Any, Tuple
+from typing import Any
 
 import yaml
 
