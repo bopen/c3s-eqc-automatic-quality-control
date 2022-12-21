@@ -22,7 +22,7 @@ import logging
 import pathlib
 import re
 from operator import itemgetter
-from typing import Any, Dict
+from typing import Any
 
 import rich.logging
 
