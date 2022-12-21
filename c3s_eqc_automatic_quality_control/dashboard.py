@@ -105,7 +105,7 @@ def update_from_logfile(logfile: pathlib.Path, info: dict[Any, Any]) -> dict[Any
             info.update({"status": match["status"]})
             if match["status"] in ("DONE", "FAILED"):
                 info.update({"stop": match["logtime"]})
-                break
+            break
         else:
             raise RuntimeError(f"No status found in logfile {logfile}")
     return info
