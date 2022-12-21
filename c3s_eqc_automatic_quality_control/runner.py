@@ -47,7 +47,7 @@ variables:
   - 2m_temperature
   - skin_temperature
 start: YYYY-MM
-stop:
+stop: YYYY-MM
 diagnostics:
   - spatial_daily_mean
 chunks:
