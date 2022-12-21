@@ -93,7 +93,7 @@ def get_most_recent_log(info: list[dict[Any, Any]]) -> dict[Any, Any]:
     return sorted_info[-1]
 
 
-def update_from_logfile(logfile: pathlib.Path, info: Dict[Any, Any]) -> Dict[Any, Any]:
+def update_from_logfile(logfile: pathlib.Path, info: dict[Any, Any]) -> dict[Any, Any]:
     with open(logfile, "r", encoding="utf-8") as f:
         # get only last matched line
         lines = f.readlines()
