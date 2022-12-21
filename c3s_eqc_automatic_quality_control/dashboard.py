@@ -113,7 +113,7 @@ def update_from_logfile(logfile: pathlib.Path, info: dict[Any, Any]) -> dict[Any
 
 def list_qars(
     qar_id: str | None = None, status: str | None = None, limit: int | None = 20
-) -> Dict[Any, Any]:
+) -> dict[Any, Any]:
     log_dir = ensure_log_dir()
     qar_map: dict[tuple[str, str], list[dict[Any, Any]]] = {}
     search = "eqc*.log"
