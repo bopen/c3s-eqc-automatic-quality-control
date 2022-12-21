@@ -17,8 +17,6 @@ This module manages the command line interfaces.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-
 import rich
 import typer
 
@@ -58,7 +56,7 @@ def show_config_template() -> None:
 @app.command()
 def run(
     config_file: str,
-    target_dir: str = typer.Option(os.getcwd(), "--target-dir", "-t"),
+    target_dir: str = typer.Option(..., "--target-dir", "-t"),
 ) -> None:
     """Run automatic quality checks and populate QAR."""
     runner.run(config_file, target_dir)
