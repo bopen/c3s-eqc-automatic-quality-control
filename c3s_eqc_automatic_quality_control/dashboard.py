@@ -19,6 +19,7 @@ This module manages the package logging.
 
 import datetime
 import logging
+import os
 import pathlib
 import re
 from operator import itemgetter
@@ -26,11 +27,14 @@ from typing import Any
 
 import rich.logging
 
+EQC_AQC_ENV_VARNAME = "EQC_AQC_DIR"
 LOG_FMT = "%(asctime)s - %(levelname)s - %(message)s"
 LOG_TIME_FMT = "%Y-%m-%d %H:%M:%S"
 FILENAME_TIME_FMT = "%Y%m%d%H%M%S"
-MSG_REGEX = "(?:.+) - QAR ID: (?P<qar_id>.+) - RUN n.: (?P<run_n>.+) - (?P<status>.+)"
-FILENAME_REGEX = "eqc_(?P<start>[0-9]{14})_(?P<qar_id>.+)_run_(?P<run_n>.+)_(?:.+).log"
+MSG_REGEX = "(?P<logtime>.+) - (?:.+) - QAR ID: (?P<qar_id>.+) - RUN n.: (?P<run_n>.+) - (?P<status>.+)"
+FILENAME_REGEX = (
+    "eqc_(?P<start>[0-9]{14})_qar_(?P<qar_id>.+)_run_(?P<run_n>.+)_(?:.+).log"
+)
 
 logging.basicConfig(
     format="%(message)s",
@@ -63,10 +67,14 @@ def set_logfile(logger: logging.Logger, logfilepath: pathlib.Path) -> logging.Lo
 
 
 def ensure_log_dir() -> pathlib.Path:
-    log_dir = pathlib.Path.home() / ".eqc/logs/"
-    if not log_dir.is_dir():
-        log_dir.mkdir(parents=True, exist_ok=True)
-    return log_dir
+    if os.environ.get(EQC_AQC_ENV_VARNAME) is None:
+        eqc_dir = pathlib.Path.home() / ".eqc"
+    else:
+        eqc_dir = pathlib.Path(os.environ[EQC_AQC_ENV_VARNAME])
+    log_dir_path = eqc_dir / "logs/"
+    if not log_dir_path.is_dir():
+        log_dir_path.mkdir(parents=True, exist_ok=True)
+    return log_dir_path
 
 
 def get_eqc_run_logger(name: str) -> logging.Logger:
@@ -91,23 +99,30 @@ def get_most_recent_log(info: list[dict[Any, Any]]) -> dict[Any, Any]:
     return sorted_info[-1]
 
 
-def update_status_from_logfile(
-    logfile: pathlib.Path, info: dict[Any, Any]
-) -> dict[Any, Any]:
-    with open(logfile, encoding="utf-8") as f:
+def update_from_logfile(logfile: pathlib.Path, info: dict[Any, Any]) -> dict[Any, Any]:
+    with open(logfile, "r", encoding="utf-8") as f:
         # get only last matched line
-        for match in map(re.compile(MSG_REGEX).match, reversed(f.readlines())):
+        status = None
+        for line in f:
+            line = line.strip("\n")
+            # Workdir path
+            if "QAR workdir: " in line:
+                info.update({"workdir": line.rsplit("QAR workdir: ", 1)[-1]})
+                continue
+            match = re.compile(MSG_REGEX).match(line)
             if match is not None:
-                info.update({"status": match["status"]})
-                break
-        else:
-            raise RuntimeError("No status found in logfile {log}")
+                status = match["status"]
+                if match["status"] in ("DONE", "FAILED"):
+                    info.update({"stop": match["logtime"]})
+                    break
+        if status is None:
+            raise RuntimeError(f"No status found in logfile {logfile}")
+        info.update({"status": status})
     return info
 
 
 def list_qars(
-    qar_id: str | None = None,
-    status: str | None = None,
+    qar_id: str | None = None, status: str | None = None, limit: int | None = 20
 ) -> dict[Any, Any]:
     log_dir = ensure_log_dir()
     qar_map: dict[tuple[str, str], list[dict[Any, Any]]] = {}
@@ -116,22 +131,24 @@ def list_qars(
     if qar_id is not None:
         search = f"eqc*{qar_id}*.log"
 
-    for log in log_dir.glob(search):
+    for log in sorted(log_dir.glob(search)):
         filename_info = re.compile(FILENAME_REGEX).match(log.name)
         if filename_info is None:
             continue
         qar_id = filename_info["qar_id"]
         run_n = filename_info["run_n"]
-        info = {"start": filename_info["start"], "logfile": str(log)}
-        info = update_status_from_logfile(log, info)
+        info = {"start": filename_info["start"], "logfile": str(log), "stop": ""}
+        info = update_from_logfile(log, info)
         qar_map[(qar_id, run_n)] = qar_map.get((qar_id, run_n), []) + [info]
 
     latest_status = {k: get_most_recent_log(v) for k, v in qar_map.items()}
+
+    # filter first {limit} results
+    latest_status = dict(sorted(latest_status.items(), key=itemgetter(0))[:limit])
 
     # Filter by status
     if status is not None:
         latest_status = {
             k: v for k, v in latest_status.items() if v["status"] == status.upper()
         }
-
     return latest_status

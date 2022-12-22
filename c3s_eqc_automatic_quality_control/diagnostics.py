@@ -21,7 +21,7 @@ import numpy as np
 import xarray as xr
 
 
-def spatial_weights(
+def _spatial_weights(
     obj: xr.Dataset | xr.DataArray, lon: str = "longitude", lat: str = "latitude"
 ) -> xr.DataArray:
     cos = np.cos(np.deg2rad(obj[lat]))
@@ -49,7 +49,7 @@ def spatial_weighted_mean(
     reduced object
     """
     with xr.set_options(keep_attrs=True):  # type: ignore[no-untyped-call]
-        weights = spatial_weights(obj, lon, lat)
+        weights = _spatial_weights(obj, lon, lat)
         return obj.weighted(weights).mean((lon, lat))
 
 
@@ -73,5 +73,5 @@ def spatial_weighted_std(
     reduced object
     """
     with xr.set_options(keep_attrs=True):  # type: ignore[no-untyped-call]
-        weights = spatial_weights(obj, lon, lat)
+        weights = _spatial_weights(obj, lon, lat)
         return obj.weighted(weights).std((lon, lat))
