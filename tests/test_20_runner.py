@@ -2,9 +2,7 @@ import glob
 import os
 import tempfile
 
-
-from c3s_eqc_automatic_quality_control import runner
-from c3s_eqc_automatic_quality_control.dashboard import EQC_AQC_ENV_VARNAME
+from c3s_eqc_automatic_quality_control import dashboard, runner
 
 EQC_CONFIG = """
 qar_id: 0
@@ -28,13 +26,13 @@ def test_run() -> None:
         temp_config = tempdir + "/temp_eqc_config.yml"
         with open(temp_config, "w") as f:
             f.write(EQC_CONFIG)
-        original_eqc_etc = os.environ.get(EQC_AQC_ENV_VARNAME)
-        os.environ[EQC_AQC_ENV_VARNAME] = tempdir
+        original_eqc_etc = os.environ.get(dashboard.EQC_AQC_ENV_VARNAME)
+        os.environ[dashboard.EQC_AQC_ENV_VARNAME] = tempdir
         runner.run(temp_config, tempdir)
         if original_eqc_etc is None:
-            os.environ.pop(EQC_AQC_ENV_VARNAME)
+            os.environ.pop(dashboard.EQC_AQC_ENV_VARNAME)
         else:
-            os.environ[EQC_AQC_ENV_VARNAME] = original_eqc_etc
+            os.environ[dashboard.EQC_AQC_ENV_VARNAME] = original_eqc_etc
         run_folder = f"{tempdir}/qar_0/run_0"
         assert os.path.isdir(run_folder)
         os.chdir(run_folder)
