@@ -110,7 +110,7 @@ def _prepare_run_workdir(
     run_n: str,
     logger: logging.Logger = LOGGER,
 ) -> pathlib.Path:
-    run_sub = pathlib.Path(target_dir) / f"qar_{qar_id}" / f"run_{run_n}"
+    run_sub = pathlib.Path(target_dir).resolve() / f"qar_{qar_id}" / f"run_{run_n}"
     logger.info(f"QAR workdir: {run_sub}")
     try:
         os.makedirs(run_sub)
