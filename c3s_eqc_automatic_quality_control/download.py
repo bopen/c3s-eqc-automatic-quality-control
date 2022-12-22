@@ -32,6 +32,7 @@ import xarray as xr
 from . import dashboard
 
 LOGGER = dashboard.get_logger()
+TO_XARRAY_KWARGS = {"harmonise": True, "pandas_read_csv_kwargs": {"comment": "#"}}
 
 
 def compute_stop_date(switch_month_day: int | None = None) -> pd.Timestamp:
@@ -243,7 +244,7 @@ def split_request(
 
     Returns
     -------
-    xr.Dataset: list of requests
+    xr.Dataset
     """
     if chunks and split_all:
         raise ValueError("`chunks` and `split_all` are mutually exclusive")
@@ -274,27 +275,15 @@ def split_request(
     return requests
 
 
-@cacholote.cacheable
 def download_and_transform_chunk(
     collection_id: str,
     request: dict[str, Any],
-    transform_func: None
-    | (
-        Callable[[xr.Dataset], xr.Dataset] | Callable[[pd.DataFrame], pd.DataFrame]
-    ) = None,
-    open_with: str = "xarray",
-) -> xr.Dataset | pd.DataFrame:
-    open_with_allowed_values = ("xarray", "pandas")
-    if open_with not in open_with_allowed_values:
-        raise ValueError(
-            f"{open_with=} is not a valid value. Allowed values: {open_with_allowed_values!r}"
-        )
+    transform_func: Callable[[xr.Dataset], xr.Dataset] | None = None,
+) -> xr.Dataset:
 
     remote = cads_toolbox.catalogue.retrieve(collection_id, request)
-    if open_with == "xarray":
-        ds = remote.to_xarray(harmonise=True)
-    elif open_with == "pandas":
-        ds = remote.to_pandas()
+    ds: xr.Dataset = remote.to_xarray(**TO_XARRAY_KWARGS)
+
     if transform_func is not None:
         ds = transform_func(ds)
     return ds
@@ -305,14 +294,10 @@ def download_and_transform(
     requests: list[dict[str, Any]] | dict[str, Any],
     chunks: dict[str, int] = {},
     split_all: bool = False,
-    transform_func: None
-    | (
-        Callable[[xr.Dataset], xr.Dataset] | Callable[[pd.DataFrame], pd.DataFrame]
-    ) = None,
-    open_with: str = "xarray",
+    transform_func: Callable[[xr.Dataset], xr.Dataset] | None = None,
     logger: logging.Logger = LOGGER,
     **kwargs: Any,
-) -> xr.Dataset | pd.DataFrame:
+) -> xr.Dataset:
     """
     Download chunking along the selected parameters, apply the function f to each chunk and merge the results.
 
@@ -326,35 +311,33 @@ def download_and_transform(
         Dictionary: {parameter_name: chunk_size}
     split_all: bool
         Split all parameters. Mutually exclusive with chunks
-    func: callable
+    transform_func: callable
         Function to apply to each single chunk
-    open_with: str
-        Backend used for opening the data file, valid values: 'xarray', or 'pandas'
     **kwargs:
         kwargs to be passed on to xr.merge or pd.concat function
 
     Returns
     -------
-    xr.Dataset or pd.DataFrame: Resulting dataset or dataframe.
+    xr.Dataset
     """
     request_list = []
-
     for request in ensure_list(requests):
         request_list.extend(split_request(request, chunks, split_all))
+
+    func_chunk = download_and_transform_chunk
+    if transform_func:
+        func_chunk = cacholote.cacheable(func_chunk)
+
     datasets = []
     for n, request_chunk in enumerate(request_list):
         logger.info(f"Gathering file {n+1} out of {len(request_list)}...")
-        ds = download_and_transform_chunk(
+        ds = func_chunk(
             collection_id,
             request=request_chunk,
             transform_func=transform_func,
-            open_with=open_with,
         )
         datasets.append(ds)
+
     logger.info("Aggregating data...")
-    if open_with == "xarray":
-        with dask.config.set({"array.slicing.split_large_chunks": True}):
-            ds = xr.merge(datasets, **kwargs)
-    else:
-        ds = pd.concat(datasets, **kwargs)
-    return ds
+    with dask.config.set({"array.slicing.split_large_chunks": True}):
+        return xr.merge(datasets, **kwargs)
