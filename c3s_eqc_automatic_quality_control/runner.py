@@ -141,7 +141,7 @@ def run_aqc(
 
         # TODO: SANITIZE ATTRS BEFORE SAVING
         logger.info(f"Saving metadata for variable '{var}'")
-        with open(f"{var}_metadata.yml", "w", encoding="utf-8") as f:
+        with open(f"{var}_metadata.json", "w", encoding="utf-8") as f:
             f.write(json.dumps(data.attrs, indent=4, default=str))
 
         for d in diagnos:

@@ -37,5 +37,5 @@ def test_run() -> None:
         assert os.path.isdir(run_folder)
         os.chdir(run_folder)
         assert "2m_temperature_spatial_weighted_mean.png" in glob.glob("*.png")
-        assert "2m_temperature_metadata.yml" in glob.glob("*.yml")
+        assert "2m_temperature_metadata.json" in glob.glob("*.json")
     os.chdir(current)
