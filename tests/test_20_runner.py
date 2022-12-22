@@ -13,8 +13,8 @@ format: grib
 time: [00]
 variables:
   - 2m_temperature
-start: 2020-01-01
-stop: 2020-02-02
+start: 2020-01
+stop: 2020-02
 diagnostics:
   - spatial_weighted_mean
 """
