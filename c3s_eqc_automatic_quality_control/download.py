@@ -35,7 +35,7 @@ LOGGER = dashboard.get_logger()
 TO_XARRAY_KWARGS = {"harmonise": True, "pandas_read_csv_kwargs": {"comment": "#"}}
 
 
-def compute_stop_date(switch_month_day: int | None = None) -> pd.Timestamp:
+def compute_stop_date(switch_month_day: int | None = None) -> pd.Period:
     today = pd.Timestamp.today()
     if switch_month_day is None:
         switch_month_day = 9
@@ -66,9 +66,7 @@ def floor_to_month(period: pd.Period, month: int = 1) -> pd.Period:
     return period
 
 
-def extract_leading_months(
-    start: pd.Period, stop: pd.Period
-) -> list[dict[str, list[int] | int]]:
+def extract_leading_months(start: pd.Period, stop: pd.Period) -> list[dict[str, Any]]:
 
     time_ranges = []
     if start.month > 1 and (start.year < stop.year or stop.month == 12):
@@ -86,9 +84,7 @@ def extract_leading_months(
     return time_ranges
 
 
-def extract_trailing_months(
-    start: pd.Period, stop: pd.Period
-) -> list[dict[str, list[int] | int]]:
+def extract_trailing_months(start: pd.Period, stop: pd.Period) -> list[dict[str, Any]]:
 
     time_ranges = []
     if not stop.month == 12:
@@ -106,9 +102,7 @@ def extract_trailing_months(
     return time_ranges
 
 
-def extract_years(
-    start: pd.Timestamp, stop: pd.Timestamp
-) -> list[dict[str, list[int]]]:
+def extract_years(start: pd.Period, stop: pd.Period) -> list[dict[str, Any]]:
 
     start = ceil_to_month(start, month=1)
     stop = floor_to_month(stop, month=12)
@@ -138,7 +132,7 @@ def compute_request_date(
         + extract_years(start, stop)
         + extract_trailing_months(start, stop)
     )
-    return time_range  # type: ignore
+    return time_range
 
 
 def update_request_date(
@@ -314,7 +308,7 @@ def download_and_transform(
     transform_func: callable
         Function to apply to each single chunk
     **kwargs:
-        kwargs to be passed on to xr.merge or pd.concat function
+        kwargs to be passed on to xr.merge
 
     Returns
     -------
