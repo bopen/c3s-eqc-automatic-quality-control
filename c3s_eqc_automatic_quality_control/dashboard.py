@@ -96,18 +96,22 @@ def get_most_recent_log(info: list[dict[Any, Any]]) -> dict[Any, Any]:
 def update_from_logfile(logfile: pathlib.Path, info: dict[Any, Any]) -> dict[Any, Any]:
     with open(logfile, "r", encoding="utf-8") as f:
         # get only last matched line
-        lines = f.readlines()
-        # Workdir path
-        info.update({"workdir": lines[1].rsplit("QAR workdir: ", 1)[-1]})
-        for match in map(re.compile(MSG_REGEX).match, list(reversed(lines))):
-            if match is None:
+        status = None
+        for line in f:
+            line = line.strip("\n")
+            # Workdir path
+            if "QAR workdir: " in line:
+                info.update({"workdir": line.rsplit("QAR workdir: ", 1)[-1]})
                 continue
-            info.update({"status": match["status"]})
-            if match["status"] in ("DONE", "FAILED"):
-                info.update({"stop": match["logtime"]})
-            break
-        else:
+            match = re.compile(MSG_REGEX).match(line)
+            if match is not None:
+                status = match["status"]
+                if match["status"] in ("DONE", "FAILED"):
+                    info.update({"stop": match["logtime"]})
+                    break
+        if status is None:
             raise RuntimeError(f"No status found in logfile {logfile}")
+        info.update({"status": status})
     return info
 
 
