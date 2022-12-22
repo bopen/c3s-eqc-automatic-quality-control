@@ -3,6 +3,7 @@
 This module offers available APIs.
 """
 
+import json
 import logging
 import os
 import pathlib
@@ -49,7 +50,7 @@ variables:
 start: YYYY-MM
 stop: YYYY-MM
 diagnostics:
-  - spatial_daily_mean
+  - spatial_weighted_mean
 chunks:
   year: 1
   month: 1
@@ -141,7 +142,7 @@ def run_aqc(
         # TODO: SANITIZE ATTRS BEFORE SAVING
         logger.info(f"Saving metadata for variable '{var}'")
         with open(f"{var}_metadata.yml", "w", encoding="utf-8") as f:
-            f.write(yaml.dump(data.attrs))
+            f.write(json.dumps(data.attrs, indent=4, default=str))
 
         for d in diagnos:
             logger.info(f"Processing diagnostic '{d}' for variable '{var}'")

@@ -19,6 +19,7 @@ This module manages the package logging.
 
 import datetime
 import logging
+import os
 import pathlib
 import re
 from operator import itemgetter
@@ -26,6 +27,7 @@ from typing import Any
 
 import rich.logging
 
+EQC_AQC_ENV_VARNAME = "EQC_AQC_DIR"
 LOG_FMT = "%(asctime)s - %(levelname)s - %(message)s"
 LOG_TIME_FMT = "%Y-%m-%d %H:%M:%S"
 FILENAME_TIME_FMT = "%Y%m%d%H%M%S"
@@ -65,10 +67,14 @@ def set_logfile(logger: logging.Logger, logfilepath: pathlib.Path) -> logging.Lo
 
 
 def ensure_log_dir() -> pathlib.Path:
-    log_dir = pathlib.Path.home() / ".eqc/logs/"
-    if not log_dir.is_dir():
-        log_dir.mkdir(parents=True, exist_ok=True)
-    return log_dir
+    if os.environ.get(EQC_AQC_ENV_VARNAME) is None:
+        eqc_dir = pathlib.Path.home() / ".eqc"
+    else:
+        eqc_dir = pathlib.Path(os.environ[EQC_AQC_ENV_VARNAME])
+    log_dir_path = eqc_dir / "logs/"
+    if not log_dir_path.is_dir():
+        log_dir_path.mkdir(parents=True, exist_ok=True)
+    return log_dir_path
 
 
 def get_eqc_run_logger(name: str) -> logging.Logger:
