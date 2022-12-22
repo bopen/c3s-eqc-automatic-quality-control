@@ -48,62 +48,77 @@ def line_plot(
 
 
 def shaded_std(
-    ds_mean: xr.Dataset | xr.DataArray,
-    ds_std: xr.Dataset | xr.DataArray,
+    ds_mean: xr.Dataset,
+    ds_std: xr.Dataset,
     vars: list[str],
-    title: str,
+    hue_dim: str | None = None,
+    title: str | None = None,
 ) -> go.Figure:
 
     data = []
     colors = iter(px.colors.qualitative.Plotly)
+    if isinstance(vars, str):
+        vars = [vars]
 
-    for var in vars:
-        rgb = next(colors)
-        rgb = pc.hex_to_rgb(rgb)
+    if hue_dim:
+        _, means = zip(*ds_mean.groupby(hue_dim))
+        _, stds = zip(*ds_std.groupby(hue_dim))
+    else:
+        means = (ds_mean, )
+        stds = (ds_std, )
 
-        da_mean = ds_mean[var]
-        da_std = ds_std[var]
+    for mean, std in zip(means, stds):
+        for var in vars:
+            rgb = next(colors)
+            rgb = pc.hex_to_rgb(rgb)
 
-        rgb = list(rgb)
-        dark = f"rgba{tuple(rgb + [1])}"
-        light = f"rgba{tuple(rgb + [.15])}"
-        data.append(
-            go.Scatter(
-                name=da_mean.attrs.get("long_name", ""),
-                x=da_mean["time"],
-                y=da_mean,
-                mode="lines",
-                line=dict(color=dark),
+            da_mean = mean[var].squeeze()
+            da_std = std[var].squeeze()
+
+            rgb = list(rgb)
+            dark = f"rgba{tuple(rgb + [1])}"
+            light = f"rgba{tuple(rgb + [.15])}"
+            if hue_dim:
+                label = str(da_mean[hue_dim].values)
+            else:
+                label = da_mean.attrs.get("long_name", var)
+            data.append(
+                go.Scatter(
+                    name=label,
+                    x=da_mean["time"],
+                    y=da_mean,
+                    mode="lines",
+                    line=dict(color=dark),
+                )
             )
-        )
-        data.append(
-            go.Scatter(
-                name="Upper Bound",
-                x=da_mean["time"],
-                y=da_mean + da_std,
-                mode="lines",
-                line=dict(width=0.25, color=dark),
-                showlegend=False,
+            data.append(
+                go.Scatter(
+                    name="Upper Bound",
+                    x=da_mean["time"],
+                    y=da_mean + da_std,
+                    mode="lines",
+                    line=dict(width=0.25, color=dark),
+                    showlegend=False,
+                )
             )
-        )
-        data.append(
-            go.Scatter(
-                name="Lower Bound",
-                x=da_mean["time"],
-                y=da_mean - da_std,
-                line=dict(width=0.25, color=dark),
-                mode="lines",
-                fillcolor=light,
-                fill="tonexty",
-                showlegend=False,
+            data.append(
+                go.Scatter(
+                    name="Lower Bound",
+                    x=da_mean["time"],
+                    y=da_mean - da_std,
+                    line=dict(width=0.25, color=dark),
+                    mode="lines",
+                    fillcolor=light,
+                    fill="tonexty",
+                    showlegend=False,
+                )
             )
-        )
-    fig = go.Figure(data)
+        fig = go.Figure(data)
 
-    fig.update_layout(
-        yaxis_title=ds_mean[var].attrs.get("units", ""),
-        title=title,
-        hovermode="x",
-        legend=dict(yanchor="bottom", y=1, xanchor="right", x=1),
-    )
+        fig.update_layout(
+            yaxis_title=ds_mean[var].attrs.get("units", ""),
+            title=title,
+            hovermode="x",
+            legend=dict(yanchor="bottom", y=1, xanchor="right", x=1),
+        )
     return fig
