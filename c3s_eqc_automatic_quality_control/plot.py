@@ -50,15 +50,19 @@ def line_plot(
 def shaded_std(
     ds_mean: xr.Dataset,
     ds_std: xr.Dataset,
-    vars: list[str],
+    vars: str | list[str],
     hue_dim: str | None = None,
     title: str | None = None,
 ) -> go.Figure:
 
-    data = []
-    colors = iter(px.colors.qualitative.Plotly)
     if isinstance(vars, str):
         vars = [vars]
+    colors = (
+        px.colors.qualitative.Plotly
+        if len(vars) <= 10
+        else px.colors.qualitative.Dark24
+    )
+    colors = iter(colors)
 
     if hue_dim:
         _, means = zip(*ds_mean.groupby(hue_dim))
@@ -67,21 +71,27 @@ def shaded_std(
         means = (ds_mean,)
         stds = (ds_std,)
 
+    data = []
     for mean, std in zip(means, stds):
         for var in vars:
             rgb = next(colors)
             rgb = pc.hex_to_rgb(rgb)
 
-            da_mean = mean[var].squeeze()
-            da_std = std[var].squeeze()
+            da_mean = mean[var].where(mean[var].notnull(), drop=True).squeeze()
+            da_std = std[var].where(mean[var].notnull(), drop=True).squeeze()
+
+            if da_mean.size <= 1:
+                continue
 
             rgb = list(rgb)
             dark = f"rgba{tuple(rgb + [1])}"
             light = f"rgba{tuple(rgb + [.15])}"
+
             if hue_dim:
                 label = str(da_mean[hue_dim].values)
             else:
                 label = da_mean.attrs.get("long_name", var)
+
             data.append(
                 go.Scatter(
                     name=label,
@@ -113,12 +123,13 @@ def shaded_std(
                     showlegend=False,
                 )
             )
-        fig = go.Figure(data)
 
-        fig.update_layout(
-            yaxis_title=ds_mean[var].attrs.get("units", ""),
-            title=title,
-            hovermode="x",
-            legend=dict(yanchor="bottom", y=1, xanchor="right", x=1),
-        )
+    fig = go.Figure(data)
+    fig.update_layout(
+        yaxis_title=ds_mean[var].attrs.get("units", ""),
+        title=title,
+        hovermode="x",
+        legend=dict(yanchor="bottom", y=1, xanchor="right", x=1),
+    )
+
     return fig

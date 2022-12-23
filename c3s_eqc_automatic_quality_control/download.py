@@ -299,7 +299,7 @@ def download_and_transform(
     chunks: dict[str, int] = {},
     split_all: bool = False,
     transform_func: Callable[[xr.Dataset], xr.Dataset] | None = None,
-    logger: logging.Logger = LOGGER,
+    logger: logging.Logger | None = None,
     **kwargs: Any,
 ) -> xr.Dataset:
     """
@@ -315,15 +315,17 @@ def download_and_transform(
         Dictionary: {parameter_name: chunk_size}
     split_all: bool
         Split all parameters. Mutually exclusive with chunks
-    transform_func: callable
+    transform_func: callable, optional
         Function to apply to each single chunk
     **kwargs:
-        kwargs to be passed on to xr.merge
+        kwargs to be passed on to xr.merge or xr.concat
 
     Returns
     -------
     xr.Dataset
     """
+    logger = logger or LOGGER
+
     request_list = []
     for request in ensure_list(requests):
         request_list.extend(split_request(request, chunks, split_all))
