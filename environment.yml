@@ -33,7 +33,7 @@ dependencies:
 - xarray
 - pip
 - pip:
-  - git+https://github.com/ecmwf-projects/cacholote.git
+  - cacholote
   - git+https://github.com/ecmwf-projects/cads-toolbox.git
   - emohawk
   - kaleido
