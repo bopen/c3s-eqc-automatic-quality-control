@@ -177,7 +177,7 @@ def run(
 
     try:
         run_aqc(request, logger)
-    except Exception:
+    except:  # noqa: E722
         logger.exception(f"{msg} - FAILED")
     else:
         logger.info(f"{msg} - DONE")
