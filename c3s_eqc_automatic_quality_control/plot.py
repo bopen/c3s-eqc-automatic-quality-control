@@ -64,8 +64,8 @@ def shaded_std(
         _, means = zip(*ds_mean.groupby(hue_dim))
         _, stds = zip(*ds_std.groupby(hue_dim))
     else:
-        means = (ds_mean, )
-        stds = (ds_std, )
+        means = (ds_mean,)
+        stds = (ds_std,)
 
     for mean, std in zip(means, stds):
         for var in vars:
