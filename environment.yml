@@ -21,6 +21,7 @@ dependencies:
 - matplotlib
 - netCDF4
 - pandas
+- pandas-stubs
 - plotly
 - pydantic
 - python-dotenv

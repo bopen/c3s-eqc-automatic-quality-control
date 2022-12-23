@@ -25,16 +25,23 @@ from typing import Any
 
 import cacholote
 import cads_toolbox
-import dask
+import numpy as np
 import pandas as pd
 import xarray as xr
 
 from . import dashboard
 
+cads_toolbox.config.USE_CACHE = True
+
 LOGGER = dashboard.get_logger()
+# In the future, this kwargs should somehow be handle upstream by the toolbox.
+TO_XARRAY_KWARGS = {
+    "harmonise": True,
+    "pandas_read_csv_kwargs": {"comment": "#"},
+}
 
 
-def compute_stop_date(switch_month_day: int | None = None) -> pd.Timestamp:
+def compute_stop_date(switch_month_day: int | None = None) -> pd.Period:
     today = pd.Timestamp.today()
     if switch_month_day is None:
         switch_month_day = 9
@@ -65,9 +72,7 @@ def floor_to_month(period: pd.Period, month: int = 1) -> pd.Period:
     return period
 
 
-def extract_leading_months(
-    start: pd.Period, stop: pd.Period
-) -> list[dict[str, list[int] | int]]:
+def extract_leading_months(start: pd.Period, stop: pd.Period) -> list[dict[str, Any]]:
 
     time_ranges = []
     if start.month > 1 and (start.year < stop.year or stop.month == 12):
@@ -85,9 +90,7 @@ def extract_leading_months(
     return time_ranges
 
 
-def extract_trailing_months(
-    start: pd.Period, stop: pd.Period
-) -> list[dict[str, list[int] | int]]:
+def extract_trailing_months(start: pd.Period, stop: pd.Period) -> list[dict[str, Any]]:
 
     time_ranges = []
     if not stop.month == 12:
@@ -105,9 +108,7 @@ def extract_trailing_months(
     return time_ranges
 
 
-def extract_years(
-    start: pd.Timestamp, stop: pd.Timestamp
-) -> list[dict[str, list[int]]]:
+def extract_years(start: pd.Period, stop: pd.Period) -> list[dict[str, Any]]:
 
     start = ceil_to_month(start, month=1)
     stop = floor_to_month(stop, month=12)
@@ -137,7 +138,7 @@ def compute_request_date(
         + extract_years(start, stop)
         + extract_trailing_months(start, stop)
     )
-    return time_range  # type: ignore
+    return time_range
 
 
 def update_request_date(
@@ -243,7 +244,7 @@ def split_request(
 
     Returns
     -------
-    xr.Dataset: list of requests
+    xr.Dataset
     """
     if chunks and split_all:
         raise ValueError("`chunks` and `split_all` are mutually exclusive")
@@ -274,27 +275,23 @@ def split_request(
     return requests
 
 
-@cacholote.cacheable
 def download_and_transform_chunk(
     collection_id: str,
     request: dict[str, Any],
-    transform_func: None
-    | (
-        Callable[[xr.Dataset], xr.Dataset] | Callable[[pd.DataFrame], pd.DataFrame]
-    ) = None,
-    open_with: str = "xarray",
-) -> xr.Dataset | pd.DataFrame:
-    open_with_allowed_values = ("xarray", "pandas")
-    if open_with not in open_with_allowed_values:
-        raise ValueError(
-            f"{open_with=} is not a valid value. Allowed values: {open_with_allowed_values!r}"
-        )
+    transform_func: Callable[[xr.Dataset], xr.Dataset] | None = None,
+) -> xr.Dataset:
 
     remote = cads_toolbox.catalogue.retrieve(collection_id, request)
-    if open_with == "xarray":
-        ds = remote.to_xarray(harmonise=True)
-    elif open_with == "pandas":
-        ds = remote.to_pandas()
+    ds: xr.Dataset = remote.to_xarray(**TO_XARRAY_KWARGS)
+
+    # This is a workaround to avoid incompatibilities introduced by the harmonization (cgul)
+    # Attribute units are not compatible with datetime-like objects
+    for da in ds.variables.values():
+        if np.issubdtype(da.dtype, np.datetime64) or np.issubdtype(
+            da.dtype, np.timedelta64
+        ):
+            da.attrs.pop("units", None)
+
     if transform_func is not None:
         ds = transform_func(ds)
     return ds
@@ -305,14 +302,10 @@ def download_and_transform(
     requests: list[dict[str, Any]] | dict[str, Any],
     chunks: dict[str, int] = {},
     split_all: bool = False,
-    transform_func: None
-    | (
-        Callable[[xr.Dataset], xr.Dataset] | Callable[[pd.DataFrame], pd.DataFrame]
-    ) = None,
-    open_with: str = "xarray",
-    logger: logging.Logger = LOGGER,
+    transform_func: Callable[[xr.Dataset], xr.Dataset] | None = None,
+    logger: logging.Logger | None = None,
     **kwargs: Any,
-) -> xr.Dataset | pd.DataFrame:
+) -> xr.Dataset:
     """
     Download chunking along the selected parameters, apply the function f to each chunk and merge the results.
 
@@ -326,35 +319,34 @@ def download_and_transform(
         Dictionary: {parameter_name: chunk_size}
     split_all: bool
         Split all parameters. Mutually exclusive with chunks
-    func: callable
+    transform_func: callable, optional
         Function to apply to each single chunk
-    open_with: str
-        Backend used for opening the data file, valid values: 'xarray', or 'pandas'
     **kwargs:
-        kwargs to be passed on to xr.merge or pd.concat function
+        kwargs to be passed on to xr.open_mfdataset
 
     Returns
     -------
-    xr.Dataset or pd.DataFrame: Resulting dataset or dataframe.
+    xr.Dataset
     """
-    request_list = []
+    logger = logger or LOGGER
 
+    request_list = []
     for request in ensure_list(requests):
         request_list.extend(split_request(request, chunks, split_all))
+
+    func_chunk = download_and_transform_chunk
+    if transform_func:
+        func_chunk = cacholote.cacheable(func_chunk)
+
     datasets = []
     for n, request_chunk in enumerate(request_list):
         logger.info(f"Gathering file {n+1} out of {len(request_list)}...")
-        ds = download_and_transform_chunk(
+        ds = func_chunk(
             collection_id,
             request=request_chunk,
             transform_func=transform_func,
-            open_with=open_with,
         )
-        datasets.append(ds)
+        datasets.append(ds.encoding["source"])
+
     logger.info("Aggregating data...")
-    if open_with == "xarray":
-        with dask.config.set({"array.slicing.split_large_chunks": True}):
-            ds = xr.merge(datasets, **kwargs)
-    else:
-        ds = pd.concat(datasets, **kwargs)
-    return ds
+    return xr.open_mfdataset(datasets, **kwargs)
