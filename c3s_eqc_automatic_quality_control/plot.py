@@ -48,9 +48,9 @@ def line_plot(
 
 
 def shaded_std(
-    ds_mean: xr.Dataset,
-    ds_std: xr.Dataset,
     vars: str | list[str],
+    ds_mean: xr.Dataset,
+    ds_std: xr.Dataset | None = None,
     hue_dim: str | None = None,
     title: str | None = None,
 ) -> go.Figure:
@@ -66,10 +66,13 @@ def shaded_std(
 
     if hue_dim:
         _, means = zip(*ds_mean.groupby(hue_dim))
-        _, stds = zip(*ds_std.groupby(hue_dim))
+        if ds_std:
+            _, stds = zip(*ds_std.groupby(hue_dim))
+        else:
+            stds = tuple(xr.Dataset() for _ in range(len(means)))
     else:
         means = (ds_mean,)
-        stds = (ds_std,)
+        stds = (ds_std,) if ds_std else (xr.Dataset(),)
 
     data = []
     for mean, std in zip(means, stds):
@@ -78,8 +81,6 @@ def shaded_std(
             rgb = pc.hex_to_rgb(rgb)
 
             da_mean = mean[var].where(mean[var].notnull(), drop=True).squeeze()
-            da_std = std[var].where(mean[var].notnull(), drop=True).squeeze()
-
             if da_mean.size <= 1:
                 continue
 
@@ -101,35 +102,37 @@ def shaded_std(
                     line=dict(color=dark),
                 )
             )
-            data.append(
-                go.Scatter(
-                    name="Upper Bound",
-                    x=da_mean["time"],
-                    y=da_mean + da_std,
-                    mode="lines",
-                    line=dict(width=0.25, color=dark),
-                    showlegend=False,
+            if std:
+                da_std = std[var].where(mean[var].notnull(), drop=True).squeeze()
+                data.append(
+                    go.Scatter(
+                        name="Upper Bound",
+                        x=da_mean["time"],
+                        y=da_mean + da_std,
+                        mode="lines",
+                        line=dict(width=0.25, color=dark),
+                        showlegend=False,
+                    )
                 )
-            )
-            data.append(
-                go.Scatter(
-                    name="Lower Bound",
-                    x=da_mean["time"],
-                    y=da_mean - da_std,
-                    line=dict(width=0.25, color=dark),
-                    mode="lines",
-                    fillcolor=light,
-                    fill="tonexty",
-                    showlegend=False,
+                data.append(
+                    go.Scatter(
+                        name="Lower Bound",
+                        x=da_mean["time"],
+                        y=da_mean - da_std,
+                        line=dict(width=0.25, color=dark),
+                        mode="lines",
+                        fillcolor=light,
+                        fill="tonexty",
+                        showlegend=False,
+                    )
                 )
-            )
 
     fig = go.Figure(data)
     fig.update_layout(
         yaxis_title=ds_mean[var].attrs.get("units", ""),
         title=title,
         hovermode="x",
-        legend=dict(yanchor="bottom", y=1, xanchor="right", x=1),
+        legend=dict(yanchor="top", y=1, xanchor="left", x=1),
     )
 
     return fig
