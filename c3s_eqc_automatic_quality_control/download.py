@@ -25,7 +25,6 @@ from typing import Any
 
 import cacholote
 import cads_toolbox
-import dask
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -39,7 +38,6 @@ LOGGER = dashboard.get_logger()
 TO_XARRAY_KWARGS = {
     "harmonise": True,
     "pandas_read_csv_kwargs": {"comment": "#"},
-    "xarray_open_dataset_kwargs": {"chunks": "auto"},
 }
 
 
@@ -324,7 +322,7 @@ def download_and_transform(
     transform_func: callable, optional
         Function to apply to each single chunk
     **kwargs:
-        kwargs to be passed on to xr.merge or xr.concat
+        kwargs to be passed on to xr.open_mfdataset
 
     Returns
     -------
@@ -348,8 +346,7 @@ def download_and_transform(
             request=request_chunk,
             transform_func=transform_func,
         )
-        datasets.append(ds)
+        datasets.append(ds.encoding["source"])
 
     logger.info("Aggregating data...")
-    with dask.config.set({"array.slicing.split_large_chunks": True}):
-        return xr.merge(datasets, **kwargs)
+    return xr.open_mfdataset(datasets, **kwargs)
