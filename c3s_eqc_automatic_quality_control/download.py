@@ -36,7 +36,11 @@ cads_toolbox.config.USE_CACHE = True
 
 LOGGER = dashboard.get_logger()
 # In the future, this kwargs should somehow be handle upstream by the toolbox.
-TO_XARRAY_KWARGS = {"harmonise": True, "pandas_read_csv_kwargs": {"comment": "#"}}
+TO_XARRAY_KWARGS = {
+    "harmonise": True,
+    "pandas_read_csv_kwargs": {"comment": "#"},
+    "xarray_open_dataset_kwargs": {"chunks": "auto"},
+}
 
 
 def compute_stop_date(switch_month_day: int | None = None) -> pd.Period:
