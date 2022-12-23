@@ -32,6 +32,8 @@ import xarray as xr
 
 from . import dashboard
 
+cads_toolbox.config.USE_CACHE = True
+
 LOGGER = dashboard.get_logger()
 # In the future, this kwargs should somehow be handle upstream by the toolbox.
 TO_XARRAY_KWARGS = {"harmonise": True, "pandas_read_csv_kwargs": {"comment": "#"}}
