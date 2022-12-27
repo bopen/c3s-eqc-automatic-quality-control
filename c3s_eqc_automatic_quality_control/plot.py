@@ -57,11 +57,12 @@ def shaded_std(
 
     if isinstance(vars, str):
         vars = [vars]
-    colors = (
-        px.colors.qualitative.Plotly
-        if len(vars) <= 10
-        else px.colors.qualitative.Dark24
-    )
+    if hue_dim or len(vars) > 10:
+        colors = px.colors.sample_colorscale(
+            "viridis", ds_mean.sizes[hue_dim], colortype="tuple"
+        )
+    else:
+        colors = px.colors.qualitative.Plotly
     colors = iter(colors)
 
     if hue_dim:
@@ -81,7 +82,8 @@ def shaded_std(
     for mean, std in zip(means, stds):
         for var in vars:
             rgb = next(colors)
-            rgb = pc.hex_to_rgb(rgb)
+            if not isinstance(rgb, tuple):
+                rgb = pc.hex_to_rgb(rgb)
 
             da_mean = mean[var].where(mean[var].notnull(), drop=True).squeeze()
             if da_mean.size <= 1:
