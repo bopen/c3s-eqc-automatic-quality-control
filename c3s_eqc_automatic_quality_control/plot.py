@@ -57,10 +57,12 @@ def shaded_std(
 
     if isinstance(vars, str):
         vars = [vars]
-    if hue_dim or len(vars) > 10:
+    if hue_dim:
         colors = px.colors.sample_colorscale(
-            "viridis", ds_mean.sizes[hue_dim], colortype="tuple"
+            "turbo", ds_mean.sizes[hue_dim], colortype="tuple"
         )
+    elif len(vars) > 10:
+        colors = px.colors.sample_colorscale("turbo", len(vars), colortype="tuple")
     else:
         colors = px.colors.qualitative.Plotly
     colors = iter(colors)
