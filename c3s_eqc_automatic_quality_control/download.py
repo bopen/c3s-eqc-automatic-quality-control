@@ -25,7 +25,6 @@ from typing import Any
 
 import cacholote
 import cads_toolbox
-import numpy as np
 import pandas as pd
 import xarray as xr
 
@@ -280,18 +279,8 @@ def download_and_transform_chunk(
     request: dict[str, Any],
     transform_func: Callable[[xr.Dataset], xr.Dataset] | None = None,
 ) -> xr.Dataset:
-
     remote = cads_toolbox.catalogue.retrieve(collection_id, request)
     ds: xr.Dataset = remote.to_xarray(**TO_XARRAY_KWARGS)
-
-    # This is a workaround to avoid incompatibilities introduced by the harmonization (cgul)
-    # Attribute units are not compatible with datetime-like objects
-    for da in ds.variables.values():
-        if np.issubdtype(da.dtype, np.datetime64) or np.issubdtype(
-            da.dtype, np.timedelta64
-        ):
-            da.attrs.pop("units", None)
-
     if transform_func is not None:
         ds = transform_func(ds)
     return ds
