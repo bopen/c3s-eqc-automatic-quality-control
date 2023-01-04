@@ -53,6 +53,7 @@ def shaded_std(
     ds_std: xr.Dataset | None = None,
     hue_dim: str | None = None,
     title: str | None = None,
+    x_dim: str = "time",
 ) -> go.Figure:
 
     if isinstance(vars, str):
@@ -103,7 +104,7 @@ def shaded_std(
             data.append(
                 go.Scatter(
                     name=label,
-                    x=da_mean["time"],
+                    x=da_mean[x_dim],
                     y=da_mean,
                     mode="lines",
                     line=dict(color=dark),
@@ -114,7 +115,7 @@ def shaded_std(
                 data.append(
                     go.Scatter(
                         name="Upper Bound",
-                        x=da_mean["time"],
+                        x=da_mean[x_dim],
                         y=da_mean + da_std,
                         mode="lines",
                         line=dict(width=0.25, color=dark),
@@ -124,7 +125,7 @@ def shaded_std(
                 data.append(
                     go.Scatter(
                         name="Lower Bound",
-                        x=da_mean["time"],
+                        x=da_mean[x_dim],
                         y=da_mean - da_std,
                         line=dict(width=0.25, color=dark),
                         mode="lines",
