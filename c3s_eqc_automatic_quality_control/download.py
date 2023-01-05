@@ -148,7 +148,8 @@ def update_request_date(
     start: str | pd.Period,
     stop: str | pd.Period | None = None,
     switch_month_day: int | None = None,
-) -> dict[str, Any] | list[dict[str, Any]]:
+    pad_month_day: bool = False,
+) -> list[dict[str, Any]]:
     """
     Return the requests defined by 'request' for the period defined by start and stop.
 
@@ -156,19 +157,17 @@ def update_request_date(
     ----------
     request: dict
         Parameters of the request
-
     start: str or pd.Period
         String {start_year}-{start_month} pd.Period with freq='M'
-
     stop: str or pd.Period
         Optional string {stop_year}-{stop_month} pd.Period with freq='M'
-
         If None the stop date is computed using the `switch_month_day`
-
     switch_month_day: int
         Used to compute the stop date in case stop is None. The stop date is computed as follows:
         if current day > switch_month_day then stop_month = current_month - 1
         else stop_month = current_month - 2
+    pad_month_day: bool
+        Whether to pad or not months and days (i.e., 1 vs 01)
 
     Returns
     -------
@@ -181,11 +180,19 @@ def update_request_date(
         stop = pd.Period(stop, "M")
 
     dates = compute_request_date(start, stop, switch_month_day=switch_month_day)
-    if isinstance(dates, dict):
-        return {**request, **dates}
     requests = []
+
     for d in dates:
-        requests.append({**request, **d})
+        padded_d = {}
+        if pad_month_day:
+            for key, value in d.items():
+                if key in ("month", "day"):
+                    padded_d[key] = (
+                        f"{value:02d}"
+                        if isinstance(value, int)
+                        else [f"{v:02d}" for v in value]
+                    )
+        requests.append({**request, **d, **padded_d})
     return requests
 
 
