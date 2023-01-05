@@ -148,7 +148,7 @@ def update_request_date(
     start: str | pd.Period,
     stop: str | pd.Period | None = None,
     switch_month_day: int | None = None,
-    pad_month_day: bool = False,
+    stringify_dates: bool = False,
 ) -> list[dict[str, Any]]:
     """
     Return the requests defined by 'request' for the period defined by start and stop.
@@ -166,8 +166,8 @@ def update_request_date(
         Used to compute the stop date in case stop is None. The stop date is computed as follows:
         if current day > switch_month_day then stop_month = current_month - 1
         else stop_month = current_month - 2
-    pad_month_day: bool
-        Whether to pad or not months and days (i.e., 1 vs 01)
+    stringify_dates: bool
+        Whether to convert date to strings
 
     Returns
     -------
@@ -184,9 +184,9 @@ def update_request_date(
 
     for d in dates:
         padded_d = {}
-        if pad_month_day:
+        if stringify_dates:
             for key, value in d.items():
-                if key in ("month", "day"):
+                if key in ("year", "month", "day"):
                     padded_d[key] = (
                         f"{value:02d}"
                         if isinstance(value, int)
