@@ -303,6 +303,9 @@ def download_and_transform_chunk(
         kwargs.setdefault("xarray_open_mfdataset_kwargs", {})
         kwargs["xarray_open_mfdataset_kwargs"]["preprocess"] = expand_dim_using_source
     ds: xr.Dataset = remote.to_xarray(**kwargs)
+    # TODO: make cacholote add coordinates? Needed to guarantee roundtrip
+    # See: https://docs.xarray.dev/en/stable/user-guide/io.html#coordinates
+    ds.attrs["coordinates"] = ", ".join([str(coord) for coord in ds.coords])
     return transform_func(ds) if transform_func else ds
 
 
