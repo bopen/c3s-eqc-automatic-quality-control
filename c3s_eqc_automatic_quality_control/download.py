@@ -305,7 +305,7 @@ def download_and_transform_chunk(
     ds: xr.Dataset = remote.to_xarray(**kwargs)
     # TODO: make cacholote add coordinates? Needed to guarantee roundtrip
     # See: https://docs.xarray.dev/en/stable/user-guide/io.html#coordinates
-    ds.attrs["coordinates"] = ", ".join([str(coord) for coord in ds.coords])
+    ds.attrs["coordinates"] = " ".join([str(coord) for coord in ds.coords])
     return transform_func(ds) if transform_func else ds
 
 
