@@ -20,6 +20,7 @@ This module manages the execution of the quality control.
 import calendar
 import itertools
 import logging
+import pathlib
 from collections.abc import Callable
 from typing import Any
 
@@ -34,7 +35,9 @@ cads_toolbox.config.USE_CACHE = True
 
 LOGGER = dashboard.get_logger()
 # In the future, this kwargs should somehow be handle upstream by the toolbox.
-TO_XARRAY_KWARGS = {
+
+
+TO_XARRAY_KWARGS: dict[str, Any] = {
     "harmonise": True,
     "pandas_read_csv_kwargs": {"comment": "#"},
 }
@@ -145,7 +148,8 @@ def update_request_date(
     start: str | pd.Period,
     stop: str | pd.Period | None = None,
     switch_month_day: int | None = None,
-) -> dict[str, Any] | list[dict[str, Any]]:
+    stringify_dates: bool = False,
+) -> list[dict[str, Any]]:
     """
     Return the requests defined by 'request' for the period defined by start and stop.
 
@@ -153,19 +157,17 @@ def update_request_date(
     ----------
     request: dict
         Parameters of the request
-
     start: str or pd.Period
         String {start_year}-{start_month} pd.Period with freq='M'
-
     stop: str or pd.Period
         Optional string {stop_year}-{stop_month} pd.Period with freq='M'
-
         If None the stop date is computed using the `switch_month_day`
-
     switch_month_day: int
         Used to compute the stop date in case stop is None. The stop date is computed as follows:
         if current day > switch_month_day then stop_month = current_month - 1
         else stop_month = current_month - 2
+    stringify_dates: bool
+        Whether to convert date to strings
 
     Returns
     -------
@@ -178,11 +180,19 @@ def update_request_date(
         stop = pd.Period(stop, "M")
 
     dates = compute_request_date(start, stop, switch_month_day=switch_month_day)
-    if isinstance(dates, dict):
-        return {**request, **dates}
     requests = []
+
     for d in dates:
-        requests.append({**request, **d})
+        padded_d = {}
+        if stringify_dates:
+            for key, value in d.items():
+                if key in ("year", "month", "day"):
+                    padded_d[key] = (
+                        f"{value:02d}"
+                        if isinstance(value, int)
+                        else [f"{v:02d}" for v in value]
+                    )
+        requests.append({**request, **d, **padded_d})
     return requests
 
 
@@ -274,16 +284,29 @@ def split_request(
     return requests
 
 
+def expand_dim_using_source(ds: xr.Dataset) -> xr.Dataset:
+    # TODO: workaround beacuse the toolbox is not able to open satellite datasets
+    if source := ds.encoding.get("source"):
+        ds = ds.expand_dims(source=[pathlib.Path(source).stem])
+    return ds
+
+
+@cacholote.cacheable
 def download_and_transform_chunk(
     collection_id: str,
     request: dict[str, Any],
     transform_func: Callable[[xr.Dataset], xr.Dataset] | None = None,
 ) -> xr.Dataset:
     remote = cads_toolbox.catalogue.retrieve(collection_id, request)
-    ds: xr.Dataset = remote.to_xarray(**TO_XARRAY_KWARGS)
-    if transform_func is not None:
-        ds = transform_func(ds)
-    return ds
+    kwargs = dict(TO_XARRAY_KWARGS)
+    if collection_id.startswith("satellite-"):
+        kwargs.setdefault("xarray_open_mfdataset_kwargs", {})
+        kwargs["xarray_open_mfdataset_kwargs"]["preprocess"] = expand_dim_using_source
+    ds: xr.Dataset = remote.to_xarray(**kwargs)
+    # TODO: make cacholote add coordinates? Needed to guarantee roundtrip
+    # See: https://docs.xarray.dev/en/stable/user-guide/io.html#coordinates
+    ds.attrs["coordinates"] = " ".join([str(coord) for coord in ds.coords])
+    return transform_func(ds) if transform_func else ds
 
 
 def download_and_transform(
@@ -323,14 +346,10 @@ def download_and_transform(
     for request in ensure_list(requests):
         request_list.extend(split_request(request, chunks, split_all))
 
-    func_chunk = download_and_transform_chunk
-    if transform_func:
-        func_chunk = cacholote.cacheable(func_chunk)
-
     datasets = []
     for n, request_chunk in enumerate(request_list):
         logger.info(f"Gathering file {n+1} out of {len(request_list)}...")
-        ds = func_chunk(
+        ds = download_and_transform_chunk(
             collection_id,
             request=request_chunk,
             transform_func=transform_func,

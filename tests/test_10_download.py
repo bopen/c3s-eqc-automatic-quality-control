@@ -256,3 +256,22 @@ def test_update_request() -> None:
 
     requests = download.update_request_date({}, "2020-02", "2022-11")
     assert len(requests) == 3
+
+
+@pytest.mark.parametrize(
+    "stringify_dates,expected_month,expected_day",
+    [
+        (False, [1], list(range(1, 32))),
+        (True, ["01"], [f"{i:02d}" for i in range(1, 32)]),
+    ],
+)
+def test_stringify_dates(
+    stringify_dates: bool,
+    expected_month: list[str | int],
+    expected_day: list[str | int],
+) -> None:
+    request, *_ = download.update_request_date(
+        {}, "2022-1", "2022-1", stringify_dates=stringify_dates
+    )
+    assert request["month"] == expected_month
+    assert request["day"] == expected_day
