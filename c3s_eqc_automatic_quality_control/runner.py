@@ -131,27 +131,29 @@ def run_aqc(
     chunks = request.get("chunks", {"year": 1, "month": 1})
 
     for var, req in cads_request.items():
-        logger.info(f"Collecting variable '{var}'")
-        data = download.download_and_transform(
-            collection_id=request["collection_id"],
-            requests=req,
-            chunks=chunks,
-            logger=logger,
-        )
-
-        # TODO: SANITIZE ATTRS BEFORE SAVING
-        logger.info(f"Saving metadata for variable '{var}'")
-        with open(f"{var}_metadata.json", "w", encoding="utf-8") as f:
-            f.write(json.dumps(data.attrs, indent=4, default=str))
-
         for d in diagnos:
-            logger.info(f"Processing diagnostic '{d}' for variable '{var}'")
-            diag_ds = getattr(diagnostics, d)(data)
+            prefix = f"{var}_{d}"
 
-            res = f"{var}_{d}.png"
-            logger.info(f"Saving diagnostic: '{res}'")
+            logger.info(f"Processing diagnostic {d!r} for variable {var!r}")
+            diag_ds = download.download_and_transform(
+                collection_id=request["collection_id"],
+                requests=req,
+                chunks=chunks,
+                logger=logger,
+                transform_func=getattr(diagnostics, d),
+            )
+
+            # TODO: SANITIZE ATTRS BEFORE SAVING
+            metadata_file = f"{prefix}_metadata.json"
+            logger.info(f"Saving metadata: {metadata_file!r}")
+            with open(metadata_file, "w", encoding="utf-8") as f:
+                json.dump(diag_ds.attrs, f, indent=4, default=str)
+
+            # TODO: CHOOSE PLOTTING FUNCTION IN CONFIG
+            image_file = f"{prefix}_image.png"
+            logger.info(f"Saving image: {image_file!r}")
             fig = plot.line_plot(diag_ds.squeeze(), var=var, title=d)
-            fig.write_image(res)
+            fig.write_image(image_file)
     return
 
 

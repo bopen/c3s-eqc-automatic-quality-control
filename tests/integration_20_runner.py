@@ -1,6 +1,5 @@
-import glob
 import os
-import tempfile
+import pathlib
 
 from c3s_eqc_automatic_quality_control import dashboard, runner
 
@@ -20,22 +19,20 @@ diagnostics:
 """
 
 
-def test_run() -> None:
-    current = os.getcwd()
-    with tempfile.TemporaryDirectory() as tempdir:
-        temp_config = tempdir + "/temp_eqc_config.yml"
-        with open(temp_config, "w") as f:
-            f.write(EQC_CONFIG)
-        original_eqc_etc = os.environ.get(dashboard.EQC_AQC_ENV_VARNAME)
-        os.environ[dashboard.EQC_AQC_ENV_VARNAME] = tempdir
-        runner.run(temp_config, tempdir)
-        if original_eqc_etc is None:
-            os.environ.pop(dashboard.EQC_AQC_ENV_VARNAME)
-        else:
-            os.environ[dashboard.EQC_AQC_ENV_VARNAME] = original_eqc_etc
-        run_folder = f"{tempdir}/qar_0/run_0"
-        assert os.path.isdir(run_folder)
-        os.chdir(run_folder)
-        assert "2m_temperature_spatial_weighted_mean.png" in glob.glob("*.png")
-        assert "2m_temperature_metadata.json" in glob.glob("*.json")
-    os.chdir(current)
+def test_run(tmp_path: pathlib.Path) -> None:
+    temp_config = tmp_path / "temp_eqc_config.yml"
+    temp_config.write_text(EQC_CONFIG)
+
+    old_environ = os.environ
+    try:
+        os.environ[dashboard.EQC_AQC_ENV_VARNAME] = str(tmp_path)
+        runner.run(str(temp_config), str(tmp_path))
+    finally:
+        os.environ.clear()
+        os.environ.update(old_environ)
+
+    run_folder = tmp_path / "qar_0" / "run_0"
+    assert set(run_folder.glob("*")) == {
+        run_folder / "2m_temperature_spatial_weighted_mean_image.png",
+        run_folder / "2m_temperature_spatial_weighted_mean_metadata.json",
+    }
