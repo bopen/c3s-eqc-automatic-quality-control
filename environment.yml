@@ -29,7 +29,7 @@ dependencies:
 - xarray
 - pip:
   - cacholote
+  - cads-toolbox
   - cgul
-  - git+https://github.com/ecmwf-projects/cads-toolbox.git
   - emohawk
   - kaleido
