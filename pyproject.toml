@@ -2,21 +2,21 @@
 requires = ["setuptools>=45", "setuptools_scm[toml]>=6.2"]
 
 [project]
-name = "c3s-eqc-automatic-quality-control"
-description = "C3S EQC Automatic Quality Control"
-readme = "README.md"
-license = {file = "LICENSE"}
 classifiers = [
-    "Development Status :: 2 - Pre-Alpha",
-    "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: Apache Software License",
-    "Operating System :: OS Independent",
-    "Programming Language :: Python",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
-    "Topic :: Scientific/Engineering"
+  "Development Status :: 2 - Pre-Alpha",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: Apache Software License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Topic :: Scientific/Engineering"
 ]
+description = "C3S EQC Automatic Quality Control"
 dynamic = ["version"]
+license = {file = "LICENSE"}
+name = "c3s-eqc-automatic-quality-control"
+readme = "README.md"
 
 [project.scripts]
 eqc = "c3s_eqc_automatic_quality_control.cli:eqc"
@@ -28,26 +28,13 @@ branch = true
 strict = true
 
 [[tool.mypy.overrides]]
+ignore_missing_imports = true
 module = [
   "cads_toolbox",
-  "plotly.*",
+  "plotly.*"
 ]
-ignore_missing_imports = true
 
 [tool.ruff]
-# Black line length is 88, but black does not format comments.
-line-length = 110
-select = [
-  # pyflakes
-  "F",
-  # pycodestyle
-  "E",
-  "W",
-  # isort
-  "I",
-  # pydocstyle
-  "D",
-]
 ignore = [
   # pydocstyle: Missing Docstrings
   "D1",
@@ -61,6 +48,19 @@ ignore = [
   "D415",
   "D416",
   "D417"
+]
+# Black line length is 88, but black does not format comments.
+line-length = 110
+select = [
+  # pyflakes
+  "F",
+  # pycodestyle
+  "E",
+  "W",
+  # isort
+  "I",
+  # pydocstyle
+  "D"
 ]
 
 [tool.setuptools]
