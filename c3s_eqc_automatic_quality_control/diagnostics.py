@@ -17,6 +17,8 @@ This module gathers available diagnostics.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Any
+
 import cacholote
 import numpy as np
 import xarray as xr
@@ -33,19 +35,27 @@ def _spatial_weights(
 
 @cacholote.cacheable
 def _regridder_weights(
-    grid_in: xr.Dataset, grid_out: xr.Dataset, method: str
+    grid_in: xr.Dataset, grid_out: xr.Dataset, method: str, **kwargs: Any
 ) -> xr.Dataset:
-    weights: xr.Dataset = xe.Regridder(grid_in, grid_out, method).weights
+    weights: xr.Dataset = xe.Regridder(grid_in, grid_out, method, **kwargs).weights
     return weights
 
 
-def _regridder(grid_in: xr.Dataset, grid_out: xr.Dataset, method: str) -> xe.Regridder:
-    grid_in = grid_in[["lon", "lat"]]
-    grid_out = grid_out[["lon", "lat"]]
+def _regridder(
+    grid_in: xr.Dataset, grid_out: xr.Dataset, method: str, **kwargs
+) -> xe.Regridder:
+    grid_in = grid_in.cf[["longitude", "latitude"]]
+    grid_out = grid_out.cf[["longitude", "latitude"]]
     grid_in.attrs = grid_out.attrs = {}
 
-    weights = _regridder_weights(grid_in, grid_out, method)
-    return xe.Regridder(grid_in, grid_out, method, weights=weights)
+    kwargs["weights"] = _regridder_weights(grid_in, grid_out, method, **kwargs)
+    return xe.Regridder(grid_in, grid_out, method, **kwargs)
+
+
+def regrid(obj, grid_out, method, **kwargs):
+    regridder = _regridder(obj, grid_out, method, **kwargs)
+    with xr.set_options(keep_attrs=True):
+        return regridder(obj)
 
 
 def spatial_weighted_mean(
