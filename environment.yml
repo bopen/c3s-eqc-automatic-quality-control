@@ -27,6 +27,7 @@ dependencies:
 - typer
 - toml
 - xarray
+- xesmf
 - pip:
   - cacholote
   - cads-toolbox

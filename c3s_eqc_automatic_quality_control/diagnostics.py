@@ -17,8 +17,10 @@ This module gathers available diagnostics.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import cacholote
 import numpy as np
 import xarray as xr
+import xesmf as xe
 
 
 def _spatial_weights(
@@ -27,6 +29,23 @@ def _spatial_weights(
     cos = np.cos(np.deg2rad(obj[lat]))
     weights: xr.DataArray = cos / (cos.sum(lat) * len(obj[lon]))
     return weights
+
+
+@cacholote.cacheable
+def _cached_weights(
+    grid_in: xr.Dataset, grid_out: xr.Dataset, method: str
+) -> xr.Dataset:
+    weights: xr.Dataset = xe.Regridder(grid_in, grid_out, method).weights
+    return weights
+
+
+def _regridder(grid_in: xr.Dataset, grid_out: xr.Dataset, method: str) -> xe.Regridder:
+    grid_in = grid_in[["lon", "lat"]]
+    grid_out = grid_out[["lon", "lat"]]
+    grid_in.attrs = grid_out.attrs = {}
+
+    weights = _cached_weights(grid_in, grid_out, method)
+    return xe.Regridder(grid_in, grid_out, method, weights=weights)
 
 
 def spatial_weighted_mean(
