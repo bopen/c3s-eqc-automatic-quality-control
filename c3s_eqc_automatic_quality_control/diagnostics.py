@@ -32,7 +32,7 @@ def _spatial_weights(
 
 
 @cacholote.cacheable
-def _cached_weights(
+def _regridder_weights(
     grid_in: xr.Dataset, grid_out: xr.Dataset, method: str
 ) -> xr.Dataset:
     weights: xr.Dataset = xe.Regridder(grid_in, grid_out, method).weights
@@ -44,7 +44,7 @@ def _regridder(grid_in: xr.Dataset, grid_out: xr.Dataset, method: str) -> xe.Reg
     grid_out = grid_out[["lon", "lat"]]
     grid_in.attrs = grid_out.attrs = {}
 
-    weights = _cached_weights(grid_in, grid_out, method)
+    weights = _regridder_weights(grid_in, grid_out, method)
     return xe.Regridder(grid_in, grid_out, method, weights=weights)
 
 
