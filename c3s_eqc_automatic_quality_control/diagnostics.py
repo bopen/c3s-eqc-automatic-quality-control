@@ -42,7 +42,7 @@ def _regridder_weights(
 
 
 def _regridder(
-    grid_in: xr.Dataset, grid_out: xr.Dataset, method: str, **kwargs
+    grid_in: xr.Dataset, grid_out: xr.Dataset, method: str, **kwargs: Any
 ) -> xe.Regridder:
     grid_in = grid_in.cf[["longitude", "latitude"]]
     grid_out = grid_out.cf[["longitude", "latitude"]]
@@ -52,10 +52,13 @@ def _regridder(
     return xe.Regridder(grid_in, grid_out, method, **kwargs)
 
 
-def regrid(obj, grid_out, method, **kwargs):
+def regrid(
+    obj: xr.Dataset, grid_out: xr.Dataset, method: str, **kwargs: Any
+) -> xr.Dataset:
     regridder = _regridder(obj, grid_out, method, **kwargs)
-    with xr.set_options(keep_attrs=True):
-        return regridder(obj)
+    with xr.set_options(keep_attrs=True):  # type: ignore[no-untyped-call]
+        obj = regridder(obj)
+    return obj
 
 
 def spatial_weighted_mean(

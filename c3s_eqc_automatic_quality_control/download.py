@@ -34,9 +34,9 @@ from . import dashboard
 cads_toolbox.config.USE_CACHE = True
 
 LOGGER = dashboard.get_logger()
+
+
 # In the future, this kwargs should somehow be handle upstream by the toolbox.
-
-
 TO_XARRAY_KWARGS: dict[str, Any] = {
     "harmonise": True,
     "pandas_read_csv_kwargs": {"comment": "#"},
@@ -295,18 +295,21 @@ def expand_dim_using_source(ds: xr.Dataset) -> xr.Dataset:
 def download_and_transform_chunk(
     collection_id: str,
     request: dict[str, Any],
-    transform_func: Callable[[xr.Dataset], xr.Dataset] | None = None,
+    transform_func: Callable[..., xr.Dataset] | None = None,
+    **kwargs: Any,
 ) -> xr.Dataset:
     remote = cads_toolbox.catalogue.retrieve(collection_id, request)
-    kwargs = dict(TO_XARRAY_KWARGS)
+    to_xarray_kwargs = dict(TO_XARRAY_KWARGS)
     if collection_id.startswith("satellite-"):
-        kwargs.setdefault("xarray_open_mfdataset_kwargs", {})
-        kwargs["xarray_open_mfdataset_kwargs"]["preprocess"] = expand_dim_using_source
-    ds: xr.Dataset = remote.to_xarray(**kwargs)
+        to_xarray_kwargs.setdefault("xarray_open_mfdataset_kwargs", {})
+        to_xarray_kwargs["xarray_open_mfdataset_kwargs"][
+            "preprocess"
+        ] = expand_dim_using_source
+    ds: xr.Dataset = remote.to_xarray(**to_xarray_kwargs)
     # TODO: make cacholote add coordinates? Needed to guarantee roundtrip
     # See: https://docs.xarray.dev/en/stable/user-guide/io.html#coordinates
     ds.attrs["coordinates"] = " ".join([str(coord) for coord in ds.coords])
-    return transform_func(ds) if transform_func else ds
+    return transform_func(ds, **kwargs) if transform_func else ds
 
 
 def download_and_transform(
@@ -314,7 +317,8 @@ def download_and_transform(
     requests: list[dict[str, Any]] | dict[str, Any],
     chunks: dict[str, int] = {},
     split_all: bool = False,
-    transform_func: Callable[[xr.Dataset], xr.Dataset] | None = None,
+    transform_func: Callable[..., xr.Dataset] | None = None,
+    transform_func_kwargs: dict[str, Any] = {},
     logger: logging.Logger | None = None,
     **kwargs: Any,
 ) -> xr.Dataset:
@@ -333,8 +337,10 @@ def download_and_transform(
         Split all parameters. Mutually exclusive with chunks
     transform_func: callable, optional
         Function to apply to each single chunk
+    transform_func_kwargs: dict
+        Kwargs to be passed on to `transform_func`
     **kwargs:
-        kwargs to be passed on to xr.open_mfdataset
+        Kwargs to be passed on to xr.open_mfdataset
 
     Returns
     -------
@@ -353,6 +359,7 @@ def download_and_transform(
             collection_id,
             request=request_chunk,
             transform_func=transform_func,
+            **transform_func_kwargs,
         )
         datasets.append(ds.encoding["source"])
 
