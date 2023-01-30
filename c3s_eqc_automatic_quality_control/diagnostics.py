@@ -37,19 +37,26 @@ def _spatial_weights(
 def _regridder_weights(
     grid_in: xr.Dataset, grid_out: xr.Dataset, method: str, **kwargs: Any
 ) -> xr.Dataset:
-    weights: xr.Dataset = xe.Regridder(grid_in, grid_out, method, **kwargs).weights
+    print("computing weights")
+    weights: xr.Dataset = xe.Regridder(
+        xr.Dataset.from_dict(grid_in), xr.Dataset.from_dict(grid_out), method, **kwargs
+    ).weights
     return weights
 
 
 def _regridder(
     grid_in: xr.Dataset, grid_out: xr.Dataset, method: str, **kwargs: Any
 ) -> xe.Regridder:
-    grid_in = grid_in.cf[["longitude", "latitude"]]
-    grid_out = grid_out.cf[["longitude", "latitude"]]
-    grid_in.attrs = grid_out.attrs = {}
+    # Remove metadate and cache using dicts
+    grid_in = grid_in.cf[["longitude", "latitude"]].to_dict()
+    grid_in.pop("attrs")
+    grid_out = grid_out.cf[["longitude", "latitude"]].to_dict()
+    grid_out.pop("attrs")
 
     kwargs["weights"] = _regridder_weights(grid_in, grid_out, method, **kwargs)
-    return xe.Regridder(grid_in, grid_out, method, **kwargs)
+    return xe.Regridder(
+        xr.Dataset.from_dict(grid_in), xr.Dataset.from_dict(grid_out), method, **kwargs
+    )
 
 
 def regrid(
