@@ -17,10 +17,11 @@ This module manages the command line interfaces.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 import rich
 import typer
 
-from . import dashboard, runner
+from . import cim, dashboard, runner
 
 STATUSES = {
     "DONE": "[green]DONE[/]",
@@ -80,6 +81,32 @@ def dasboard(
             info["workdir"],
         )
     rich.print(table)
+
+
+@app.command(name="list-tasks")
+def list_task(
+    base_url: str = typer.Option(cim.CIM, "--base-url", "-b"),
+    auth: str = typer.Option(None, "--auth", "-a"),
+) -> None:
+    """List QAR tasks."""
+    if auth is None:
+        auth = cim.get_api_credentials()
+    res = cim.get_tasks(base_url, auth=auth)
+    rich.print(res)
+
+
+@app.command(name="push-image")
+def push_image(
+    image: str,
+    task_id: str = typer.Option(..., "--task-id", "-t"),
+    metadata_path: str = typer.Option(None, "--meta-data", "-d"),
+    base_url: str = typer.Option(cim.CIM, "--base-url", "-b"),
+    auth: str = typer.Option(None, "--auth", "-a"),
+) -> None:
+    """Push image and relative info to a QAR task."""
+    if auth is None:
+        auth = cim.get_api_credentials()
+    cim.push_to_qar(base_url, task_id, image, metadata_path, auth=auth)
 
 
 if __name__ == "__main__":
