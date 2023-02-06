@@ -89,6 +89,31 @@ def spatial_weighted_mean(
         return obj.weighted(weights).mean((lon, lat))
 
 
+def time_weighted_seasonal_mean(obj: xr.Dataset, time: str = "time") -> xr.Dataset:
+    """
+    Calculate seasonal weighted mean.
+
+    Parameters
+    ----------
+    obj: xr.Dataset
+        Input data on which to apply the spatial mean
+    time: str, optional
+        Name of time coordinate
+
+    Returns
+    -------
+    reduced object
+    """
+    obj = obj.convert_calendar("noleap", align_on="date")
+    month_length = obj[time].dt.days_in_month
+    weights = (
+        month_length.groupby(f"{time}.season")
+        / month_length.groupby(f"{time}.season").sum()
+    )
+    obj = (obj * weights).groupby(f"{time}.season").sum(dim=time)
+    return obj
+
+
 def spatial_weighted_std(
     obj: xr.Dataset | xr.DataArray, lon: str = "longitude", lat: str = "latitude"
 ) -> xr.Dataset | xr.DataArray:
