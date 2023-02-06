@@ -89,7 +89,7 @@ def spatial_weighted_mean(
         return obj.weighted(weights).mean((lon, lat))
 
 
-def time_weighted_seasonal_mean(obj: xr.Dataset, time: str = "time") -> xr.Dataset:
+def seasonal_weighted_mean(obj: xr.Dataset, time: str = "time") -> xr.Dataset:
     """
     Calculate seasonal weighted mean.
 
