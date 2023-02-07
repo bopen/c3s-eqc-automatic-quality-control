@@ -16,11 +16,15 @@ This module offers plot functions to visualise diagnostic results.
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Any
 
+import cartopy.crs as ccrs
 import plotly.colors as pc
 import plotly.express as px
 import plotly.graph_objs as go
 import xarray as xr
+from cartopy.mpl.geocollection import GeoQuadMesh
+from xarray.plot.facetgrid import FacetGrid
 
 VAR_NAMES_MAP = {
     "2m_temperature": "t2m",
@@ -144,3 +148,41 @@ def shaded_std(
     )
 
     return fig
+
+
+levels = range(-30, 31, 5)
+colormap = "YlOrRd"
+
+
+def global_map(da: xr.DataArray, **kwargs: Any) -> GeoQuadMesh | FacetGrid[Any]:
+    """Plot global map.
+
+    Parameters
+    ----------
+    da: DataArray
+        DataArray to plot
+    **kwargs:
+        Keyword arguments for `da.plot`
+
+    Returns
+    -------
+    GeoQuadMesh or FacetGrid
+    """
+    # Set defaults
+    subplot_kws = kwargs.setdefault("subplot_kws", dict())
+    subplot_kws.setdefault("projection", ccrs.Robinson())
+    kwargs.setdefault("transform", ccrs.PlateCarree())
+
+    # Plot
+    p = da.plot(**kwargs)
+
+    # Add coastlines and gridlines
+    if isinstance(p, FacetGrid):
+        for ax in p.axs.flat:
+            ax.coastlines()
+            ax.gridlines()
+    else:
+        p.axes.coastlines()
+        p.axes.gridlines()
+
+    return p

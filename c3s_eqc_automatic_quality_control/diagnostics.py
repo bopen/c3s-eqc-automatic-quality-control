@@ -60,8 +60,7 @@ def regrid(
     obj: xr.Dataset, grid_out: xr.Dataset, method: str, **kwargs: Any
 ) -> xr.Dataset:
     regridder = _regridder(obj, grid_out, method, **kwargs)
-    with xr.set_options(keep_attrs=True):  # type: ignore[no-untyped-call]
-        obj = regridder(obj)
+    obj = regridder(obj, keep_attrs=True)
     return obj
 
 
@@ -104,14 +103,15 @@ def seasonal_weighted_mean(obj: xr.Dataset, time: str = "time") -> xr.Dataset:
     -------
     reduced object
     """
-    obj = obj.convert_calendar("noleap", align_on="date")
-    month_length = obj[time].dt.days_in_month
-    weights = (
-        month_length.groupby(f"{time}.season")
-        / month_length.groupby(f"{time}.season").sum()
-    )
-    obj = (obj * weights).groupby(f"{time}.season").sum(dim=time)
-    return obj
+    with xr.set_options(keep_attrs=True):  # type: ignore[no-untyped-call]
+        obj = obj.convert_calendar("noleap", align_on="date")
+        month_length = obj[time].dt.days_in_month
+        weights = (
+            month_length.groupby(f"{time}.season")
+            / month_length.groupby(f"{time}.season").sum()
+        )
+        obj = (obj * weights).groupby(f"{time}.season").sum(dim=time)
+        return obj
 
 
 def spatial_weighted_std(
