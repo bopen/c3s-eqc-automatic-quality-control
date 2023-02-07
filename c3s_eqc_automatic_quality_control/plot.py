@@ -19,12 +19,15 @@ This module offers plot functions to visualise diagnostic results.
 from typing import Any
 
 import cartopy.crs as ccrs
+import matplotlib.pyplot as plt
 import plotly.colors as pc
 import plotly.express as px
 import plotly.graph_objs as go
 import xarray as xr
 from cartopy.mpl.geocollection import GeoQuadMesh
 from xarray.plot.facetgrid import FacetGrid
+
+from . import diagnostics
 
 VAR_NAMES_MAP = {
     "2m_temperature": "t2m",
@@ -168,6 +171,8 @@ def global_map(da: xr.DataArray, **kwargs: Any) -> GeoQuadMesh | FacetGrid[Any]:
     -------
     GeoQuadMesh or FacetGrid
     """
+    da = da.load()
+
     # Set defaults
     subplot_kws = kwargs.setdefault("subplot_kws", dict())
     subplot_kws.setdefault("projection", ccrs.Robinson())
@@ -184,5 +189,22 @@ def global_map(da: xr.DataArray, **kwargs: Any) -> GeoQuadMesh | FacetGrid[Any]:
     else:
         p.axes.coastlines()
         p.axes.gridlines()
+
+        # Add stats
+        stats = {
+            "mean": diagnostics.spatial_weighted_mean(da),
+            "std": diagnostics.spatial_weighted_std(da),
+            "min": da.min(),
+            "max": da.max(),
+        }
+        txt = "\n".join(
+            [
+                f"{k:>4}: {v.squeeze().values:f} {da.attrs.get('units', '')}"
+                for k, v in stats.items()
+            ]
+        )
+        plt.figtext(
+            1, 0.5, txt, ha="left", va="center", figure=p.figure, fontfamily="monospace"
+        )
 
     return p
