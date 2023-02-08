@@ -171,8 +171,6 @@ def global_map(da: xr.DataArray, **kwargs: Any) -> GeoQuadMesh | FacetGrid[Any]:
     -------
     GeoQuadMesh or FacetGrid
     """
-    da = da.load()
-
     # Set defaults
     subplot_kws = kwargs.setdefault("subplot_kws", dict())
     subplot_kws.setdefault("projection", ccrs.Robinson())

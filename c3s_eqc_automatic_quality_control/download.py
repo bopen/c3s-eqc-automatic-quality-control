@@ -306,6 +306,9 @@ def download_and_transform_chunk(
             "preprocess"
         ] = expand_dim_using_source
     ds: xr.Dataset = remote.to_xarray(**to_xarray_kwargs)
+    # TODO: workaround: cgul should make bounds coordinates
+    bounds = set(sum(ds.cf.bounds.values(), []))
+    ds = ds.set_coords(bounds)
     # TODO: make cacholote add coordinates? Needed to guarantee roundtrip
     # See: https://docs.xarray.dev/en/stable/user-guide/io.html#coordinates
     ds.attrs["coordinates"] = " ".join([str(coord) for coord in ds.coords])
