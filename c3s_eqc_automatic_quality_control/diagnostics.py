@@ -95,7 +95,7 @@ def seasonal_weighted_mean(obj: xr.Dataset, time: str = "time") -> xr.Dataset:
     Parameters
     ----------
     obj: xr.Dataset
-        Input data on which to apply the spatial mean
+        Input data on which to apply the seasonal mean
     time: str
         Name of time coordinate
 
@@ -111,7 +111,33 @@ def seasonal_weighted_mean(obj: xr.Dataset, time: str = "time") -> xr.Dataset:
             / month_length.groupby(f"{time}.season").sum()
         )
         obj = (obj * weights).groupby(f"{time}.season").sum(dim=time)
-        return obj
+    return obj
+
+
+def annual_weighted_mean(obj: xr.Dataset, time: str = "time") -> xr.Dataset:
+    """
+    Calculate annual weighted mean.
+
+    Parameters
+    ----------
+    obj: xr.Dataset
+        Input data on which to apply the annual mean
+    time: str
+        Name of time coordinate
+
+    Returns
+    -------
+    reduced object
+    """
+    season_obj = seasonal_weighted_mean(obj, time)
+    with xr.set_options(keep_attrs=True):  # type: ignore[no-untyped-call]
+        obj = obj.convert_calendar("noleap", align_on="date")
+        month_length = obj[time].dt.days_in_month
+        weights = month_length.groupby(f"{time}.season").sum() / (
+            month_length.groupby(f"{time}.season").sum().sum()
+        )
+        obj = (season_obj * weights).sum(dim="season") / weights.sum("season")
+    return obj
 
 
 def spatial_weighted_std(
