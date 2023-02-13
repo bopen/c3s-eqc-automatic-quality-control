@@ -17,20 +17,72 @@ This module gathers available diagnostics.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Any
+
+import cacholote
 import numpy as np
 import xarray as xr
+import xesmf as xe
+
+
+def _get_lon_and_lat(
+    obj: xr.Dataset | xr.DataArray, lon: str | None, lat: str | None
+) -> tuple[str, str]:
+    if lon is None:
+        (lon,) = obj.cf.coordinates["longitude"]
+    if lat is None:
+        (lat,) = obj.cf.coordinates["latitude"]
+    return lon, lat
+
+
+def _get_time(obj: xr.Dataset | xr.DataArray, time: str | None) -> str:
+    if time is None:
+        (time,) = obj.cf.coordinates["time"]
+    return time
 
 
 def _spatial_weights(
-    obj: xr.Dataset | xr.DataArray, lon: str = "longitude", lat: str = "latitude"
+    obj: xr.Dataset | xr.DataArray, lon: str | None = None, lat: str | None = None
 ) -> xr.DataArray:
+    lon, lat = _get_lon_and_lat(obj, lon, lat)
     cos = np.cos(np.deg2rad(obj[lat]))
     weights: xr.DataArray = cos / (cos.sum(lat) * len(obj[lon]))
     return weights
 
 
+@cacholote.cacheable
+def _regridder_weights(
+    dict_in: dict[str, Any], dict_out: dict[str, Any], method: str, **kwargs: Any
+) -> xr.Dataset:
+    weights: xr.Dataset = xe.Regridder(
+        xr.Dataset.from_dict(dict_in), xr.Dataset.from_dict(dict_out), method, **kwargs
+    ).weights
+    return weights
+
+
+def _regridder(
+    grid_in: xr.Dataset, grid_out: xr.Dataset, method: str, **kwargs: Any
+) -> xe.Regridder:
+    # Remove metadate and cache using dicts
+    dict_in = grid_in.cf[["longitude", "latitude"]].to_dict()
+    dict_in.pop("attrs")
+    dict_out = grid_out.cf[["longitude", "latitude"]].to_dict()
+    dict_out.pop("attrs")
+
+    kwargs["weights"] = _regridder_weights(dict_in, dict_out, method, **kwargs)
+    return xe.Regridder(grid_in, grid_out, method, **kwargs)
+
+
+def regrid(
+    obj: xr.Dataset, grid_out: xr.Dataset, method: str, **kwargs: Any
+) -> xr.Dataset:
+    regridder = _regridder(obj, grid_out, method, **kwargs)
+    obj = regridder(obj, keep_attrs=True)
+    return obj
+
+
 def spatial_weighted_mean(
-    obj: xr.Dataset | xr.DataArray, lon: str = "longitude", lat: str = "latitude"
+    obj: xr.Dataset | xr.DataArray, lon: str | None = None, lat: str | None = None
 ) -> xr.Dataset | xr.DataArray:
     """
     Calculate spatial mean of ds with latitude weighting.
@@ -48,13 +100,70 @@ def spatial_weighted_mean(
     -------
     reduced object
     """
+    lon, lat = _get_lon_and_lat(obj, lon, lat)
     with xr.set_options(keep_attrs=True):  # type: ignore[no-untyped-call]
         weights = _spatial_weights(obj, lon, lat)
         return obj.weighted(weights).mean((lon, lat))
 
 
+def seasonal_weighted_mean(obj: xr.Dataset, time: str | None = None) -> xr.Dataset:
+    """
+    Calculate seasonal weighted mean.
+
+    Parameters
+    ----------
+    obj: xr.Dataset
+        Input data on which to apply the seasonal mean
+    time: str, optional
+        Name of time coordinate
+
+    Returns
+    -------
+    reduced object
+    """
+    time = _get_time(obj, time)
+
+    with xr.set_options(keep_attrs=True):  # type: ignore[no-untyped-call]
+        obj = obj.convert_calendar("noleap", align_on="date")
+        month_length = obj[time].dt.days_in_month
+        weights = (
+            month_length.groupby(f"{time}.season")
+            / month_length.groupby(f"{time}.season").sum()
+        )
+        obj = (obj * weights).groupby(f"{time}.season").sum(dim=time)
+    return obj
+
+
+def annual_weighted_mean(obj: xr.Dataset, time: str | None = None) -> xr.Dataset:
+    """
+    Calculate annual weighted mean.
+
+    Parameters
+    ----------
+    obj: xr.Dataset
+        Input data on which to apply the annual mean
+    time: str, optional
+        Name of time coordinate
+
+    Returns
+    -------
+    reduced object
+    """
+    time = _get_time(obj, time)
+
+    season_obj = seasonal_weighted_mean(obj, time)
+    with xr.set_options(keep_attrs=True):  # type: ignore[no-untyped-call]
+        obj = obj.convert_calendar("noleap", align_on="date")
+        month_length = obj[time].dt.days_in_month
+        weights = month_length.groupby(f"{time}.season").sum() / (
+            month_length.groupby(f"{time}.season").sum().sum()
+        )
+        obj = (season_obj * weights).sum(dim="season") / weights.sum("season")
+    return obj
+
+
 def spatial_weighted_std(
-    obj: xr.Dataset | xr.DataArray, lon: str = "longitude", lat: str = "latitude"
+    obj: xr.Dataset | xr.DataArray, lon: str | None = None, lat: str | None = None
 ) -> xr.Dataset | xr.DataArray:
     """
     Calculate spatial std of ds with latitude weighting.
@@ -72,6 +181,7 @@ def spatial_weighted_std(
     -------
     reduced object
     """
+    lon, lat = _get_lon_and_lat(obj, lon, lat)
     with xr.set_options(keep_attrs=True):  # type: ignore[no-untyped-call]
         weights = _spatial_weights(obj, lon, lat)
         return obj.weighted(weights).std((lon, lat))
