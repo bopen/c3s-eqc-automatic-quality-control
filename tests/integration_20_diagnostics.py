@@ -37,4 +37,9 @@ def test_regrid() -> None:
             "periodic": True,
         }
     )
-    assert ds_era5.sizes == ds_cmip6.sizes
+    assert dict(ds_cmip6.sizes) == {
+        "time": 1,
+        "latitude": 721,
+        "longitude": 1440,
+        "bnds": 2,
+    }
