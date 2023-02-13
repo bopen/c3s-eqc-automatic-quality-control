@@ -91,9 +91,9 @@ def spatial_weighted_mean(
     ----------
     obj: xr.Dataset or xr.DataArray
         Input data on which to apply the spatial mean
-    lon: str
+    lon: str, optional
         Name of longitude coordinate
-    lat: str
+    lat: str, optional
         Name of latitude coordinate
 
     Returns
@@ -114,7 +114,7 @@ def seasonal_weighted_mean(obj: xr.Dataset, time: str | None = None) -> xr.Datas
     ----------
     obj: xr.Dataset
         Input data on which to apply the seasonal mean
-    time: str
+    time: str, optional
         Name of time coordinate
 
     Returns
@@ -142,7 +142,7 @@ def annual_weighted_mean(obj: xr.Dataset, time: str | None = None) -> xr.Dataset
     ----------
     obj: xr.Dataset
         Input data on which to apply the annual mean
-    time: str
+    time: str, optional
         Name of time coordinate
 
     Returns
@@ -172,9 +172,9 @@ def spatial_weighted_std(
     ----------
     obj: xr.Dataset or xr.DataArray
         Input data on which to apply the spatial mean
-    lon: str
+    lon: str, optional
         Name of longitude coordinate
-    lat: str
+    lat: str, optional
         Name of latitude coordinate
 
     Returns
