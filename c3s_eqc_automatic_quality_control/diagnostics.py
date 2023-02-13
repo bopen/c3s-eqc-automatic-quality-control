@@ -25,9 +25,26 @@ import xarray as xr
 import xesmf as xe
 
 
+def _get_lon_and_lat(
+    obj: xr.Dataset | xr.DataArray, lon: str | None, lat: str | None
+) -> tuple[str, str]:
+    if lon is None:
+        (lon,) = obj.cf.coordinates["longitude"]
+    if lat is None:
+        (lat,) = obj.cf.coordinates["latitude"]
+    return lon, lat
+
+
+def _get_time(obj: xr.Dataset | xr.DataArray, time: str | None) -> str:
+    if time is None:
+        (time,) = obj.cf.coordinates["time"]
+    return time
+
+
 def _spatial_weights(
-    obj: xr.Dataset | xr.DataArray, lon: str = "longitude", lat: str = "latitude"
+    obj: xr.Dataset | xr.DataArray, lon: str | None = None, lat: str | None = None
 ) -> xr.DataArray:
+    lon, lat = _get_lon_and_lat(obj, lon, lat)
     cos = np.cos(np.deg2rad(obj[lat]))
     weights: xr.DataArray = cos / (cos.sum(lat) * len(obj[lon]))
     return weights
@@ -65,7 +82,7 @@ def regrid(
 
 
 def spatial_weighted_mean(
-    obj: xr.Dataset | xr.DataArray, lon: str = "longitude", lat: str = "latitude"
+    obj: xr.Dataset | xr.DataArray, lon: str | None = None, lat: str | None = None
 ) -> xr.Dataset | xr.DataArray:
     """
     Calculate spatial mean of ds with latitude weighting.
@@ -83,12 +100,13 @@ def spatial_weighted_mean(
     -------
     reduced object
     """
+    lon, lat = _get_lon_and_lat(obj, lon, lat)
     with xr.set_options(keep_attrs=True):  # type: ignore[no-untyped-call]
         weights = _spatial_weights(obj, lon, lat)
         return obj.weighted(weights).mean((lon, lat))
 
 
-def seasonal_weighted_mean(obj: xr.Dataset, time: str = "time") -> xr.Dataset:
+def seasonal_weighted_mean(obj: xr.Dataset, time: str | None = None) -> xr.Dataset:
     """
     Calculate seasonal weighted mean.
 
@@ -103,6 +121,8 @@ def seasonal_weighted_mean(obj: xr.Dataset, time: str = "time") -> xr.Dataset:
     -------
     reduced object
     """
+    time = _get_time(obj, time)
+
     with xr.set_options(keep_attrs=True):  # type: ignore[no-untyped-call]
         obj = obj.convert_calendar("noleap", align_on="date")
         month_length = obj[time].dt.days_in_month
@@ -114,7 +134,7 @@ def seasonal_weighted_mean(obj: xr.Dataset, time: str = "time") -> xr.Dataset:
     return obj
 
 
-def annual_weighted_mean(obj: xr.Dataset, time: str = "time") -> xr.Dataset:
+def annual_weighted_mean(obj: xr.Dataset, time: str | None = None) -> xr.Dataset:
     """
     Calculate annual weighted mean.
 
@@ -129,6 +149,8 @@ def annual_weighted_mean(obj: xr.Dataset, time: str = "time") -> xr.Dataset:
     -------
     reduced object
     """
+    time = _get_time(obj, time)
+
     season_obj = seasonal_weighted_mean(obj, time)
     with xr.set_options(keep_attrs=True):  # type: ignore[no-untyped-call]
         obj = obj.convert_calendar("noleap", align_on="date")
@@ -141,7 +163,7 @@ def annual_weighted_mean(obj: xr.Dataset, time: str = "time") -> xr.Dataset:
 
 
 def spatial_weighted_std(
-    obj: xr.Dataset | xr.DataArray, lon: str = "longitude", lat: str = "latitude"
+    obj: xr.Dataset | xr.DataArray, lon: str | None = None, lat: str | None = None
 ) -> xr.Dataset | xr.DataArray:
     """
     Calculate spatial std of ds with latitude weighting.
@@ -159,6 +181,7 @@ def spatial_weighted_std(
     -------
     reduced object
     """
+    lon, lat = _get_lon_and_lat(obj, lon, lat)
     with xr.set_options(keep_attrs=True):  # type: ignore[no-untyped-call]
         weights = _spatial_weights(obj, lon, lat)
         return obj.weighted(weights).std((lon, lat))
