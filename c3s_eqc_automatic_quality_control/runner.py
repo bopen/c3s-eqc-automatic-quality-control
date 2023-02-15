@@ -3,7 +3,6 @@
 This module offers available APIs.
 """
 
-import json
 import logging
 import os
 import pathlib
@@ -144,13 +143,22 @@ def run_aqc(
             )
 
             # TODO: SANITIZE ATTRS BEFORE SAVING
-            metadata_file = f"{prefix}_metadata.json"
+            metadata_file = f"{prefix}.yml"
             logger.info(f"Saving metadata: {metadata_file!r}")
             with open(metadata_file, "w", encoding="utf-8") as f:
-                json.dump(diag_ds.attrs, f, indent=4, default=str)
+                yaml.safe_dump({
+                    "keys": {
+                        "variable": var
+                    },
+                    "metadata": {
+                        "diagnostic": d,
+                        "variable": var
+                    },
+                    "caption": " ".join(prefix.split("_"))
+                }, f)
 
             # TODO: CHOOSE PLOTTING FUNCTION IN CONFIG
-            image_file = f"{prefix}_image.png"
+            image_file = f"{prefix}.png"
             logger.info(f"Saving image: {image_file!r}")
             fig = plot.line_plot(diag_ds.squeeze(), var=var, title=d)
             fig.write_image(image_file)

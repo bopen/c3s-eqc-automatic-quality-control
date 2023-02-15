@@ -17,7 +17,7 @@ This module offers interfaces with the CIM API.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
+import pathlib
 import os
 import requests
 from typing import Any, Tuple
@@ -78,24 +78,28 @@ def push_image_to_task(
     return res.json().get("id")
 
 
-def push_image_attrs_to_task(baseurl, image_id, task_id, metadata, auth) -> None:
+def push_attrs_to_task(baseurl, task_id, metadata, auth) -> None:
     headers = {
         "Content-Type": "application/json",
     }
     endpoint = baseurl + f"workflows/cds/tasks/{task_id}/images"
-
-    if metadata is None:
-        metadata = {}
-    metadata.update({"imageId": image_id})
-    json_data = {"images": [metadata]}
-    http_request(endpoint, "post", auth=auth, headers=headers, json=json_data)
+    json_data = {"images": metadata}
+    return http_request(endpoint, "post", auth=auth, headers=headers, json=json_data)
 
 
-def push_to_qar(baseurl, task_id, image_path, metadata_path, auth):
-    if auth is None:
-        auth = get_api_credentials()
-    im_id = push_image_to_task(baseurl, task_id, image_path, auth)
-    print(f"image id: {im_id}")
-    with open(metadata_path, "r") as f:
-        metadata = yaml.safe_load(f.read())
-    push_image_attrs_to_task(baseurl, im_id, task_id, metadata, auth)
+def push_to_task(baseurl, task_id, workdir, auth):
+    im_paths = [str(im.absolute()) for im in pathlib.Path(workdir).glob("*.png")]
+    meta_paths = [str(meta.absolute()) for meta in pathlib.Path(workdir).glob("*.yml")]
+    if len(im_paths) != len(meta_paths):
+        raise ValueError(
+            f"n. of images {len(im_paths)} and n. of metadata {len(meta_paths)} do not match."
+        )
+    image_ids = [push_image_to_task(baseurl, task_id, im, auth) for im in im_paths]
+    print(f"image id-s: {image_ids}")
+    metadata = []
+    for image_id, meta in zip(image_ids, meta_paths):
+        with open(meta, "r") as f:
+            im_attrs = yaml.safe_load(f.read())
+            im_attrs.update({"imageId": image_id})
+            metadata.append(im_attrs)
+    return push_attrs_to_task(baseurl, task_id, metadata, auth)

@@ -17,6 +17,7 @@ This module manages the command line interfaces.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import List
 
 import rich
 import typer
@@ -95,18 +96,24 @@ def list_task(
     rich.print(res)
 
 
-@app.command(name="push-image")
-def push_image(
-    image: str,
-    task_id: str = typer.Option(..., "--task-id", "-t"),
-    metadata_path: str = typer.Option(None, "--meta-data", "-d"),
+@app.command(name="push")
+def push(
+    task_id: str,
+    workdir: str = typer.Option(..., "--workdir", "-w"),
     base_url: str = typer.Option(cim.CIM, "--base-url", "-b"),
     auth: str = typer.Option(None, "--auth", "-a"),
 ) -> None:
     """Push image and relative info to a QAR task."""
     if auth is None:
         auth = cim.get_api_credentials()
-    cim.push_to_qar(base_url, task_id, image, metadata_path, auth=auth)
+    cim.push_to_task(base_url, task_id, workdir, auth=auth)
+
+
+@app.command(name="info")
+def info() -> None:
+    """Print info about EQC AQC installation"""
+    etc = dashboard.ensure_log_dir()
+    rich.print("LOG DIR:", etc)
 
 
 if __name__ == "__main__":
