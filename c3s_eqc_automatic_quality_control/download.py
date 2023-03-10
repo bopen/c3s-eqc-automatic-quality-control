@@ -303,7 +303,7 @@ def get_source(
     for request in request_list:
         data = cads_toolbox.catalogue.retrieve(collection_id, request).data
         if content := getattr(data, "_content", None):
-            source | set(map(str, content))
+            source.update(map(str, content))
         else:
             source.add(str(data.source))
 
@@ -402,7 +402,7 @@ def download_and_transform(
     logger = logger or LOGGER
 
     download_and_transform_requests = _download_and_transform_requests
-    if transform_func:
+    if transform_func is not None:
         download_and_transform_requests = cacholote.cacheable(
             download_and_transform_requests
         )
