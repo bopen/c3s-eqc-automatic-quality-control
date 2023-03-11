@@ -23,7 +23,7 @@ import itertools
 import logging
 import pathlib
 from collections.abc import Callable
-from typing import Any, Dict
+from typing import Any
 
 import cacholote
 import cads_toolbox
@@ -287,7 +287,7 @@ def split_request(
     return requests
 
 
-def expand_dim_using_source(ds: xr.Dataset) -> xr.Dataset:
+def preprocess_satellite(ds: xr.Dataset) -> xr.Dataset:
     # TODO: workaround beacuse the toolbox is not able to open satellite datasets
     if source := ds.encoding.get("source"):
         ds = ds.expand_dims(source=[pathlib.Path(source).stem])
@@ -300,7 +300,8 @@ def get_source(
     exclude: list[str] = ["*.png", "*.json"],
 ) -> list[str]:
     source: set[str] = set()
-    for request in request_list:
+
+    for request in tqdm.tqdm(request_list) if len(request_list) > 1 else request_list:
         data = cads_toolbox.catalogue.retrieve(collection_id, request).data
         if content := getattr(data, "_content", None):
             source.update(map(str, content))
@@ -346,14 +347,9 @@ def _download_and_transform_requests(
     collection_id: str,
     request_list: list[dict[str, Any]],
     transform_func: Callable[..., xr.Dataset] | None,
-    transform_func_kwargs: Dict[str, Any],
+    transform_func_kwargs: dict[str, Any],
     **open_mfdataset_kwargs: Any,
 ) -> xr.Dataset:
-
-    open_mfdataset_kwargs.setdefault(
-        "preprocess",
-        expand_dim_using_source if collection_id.startswith("satellite-") else None,
-    )
 
     data = get_data(get_source(collection_id, request_list))
     ds = data.to_xarray(
@@ -401,12 +397,24 @@ def download_and_transform(
     """
     logger = logger or LOGGER
 
+    # Open mfdataset kwargs
+    defaults: dict[str, Any] = {
+        "chunks": {},
+        "preprocess": preprocess_satellite
+        if collection_id.startswith("satellite-")
+        else None,
+    }
+    for key, value in defaults.items():
+        open_mfdataset_kwargs.setdefault(key, value)
+
+    # Cache results
     download_and_transform_requests = _download_and_transform_requests
     if transform_func is not None:
         download_and_transform_requests = cacholote.cacheable(
             download_and_transform_requests
         )
 
+    # Split requests
     request_list = []
     for request in ensure_list(requests):
         request_list.extend(split_request(request, chunks, split_all))
