@@ -60,15 +60,19 @@ def _regridder_weights(
     return weights
 
 
+def _grid_to_dict(grid: xr.Dataset) -> dict[str, Any]:
+    coords = grid.cf.coordinates["longitude"] + grid.cf.coordinates["latitude"]
+    grid_dict: dict[str, Any] = grid[coords].to_dict()
+    grid_dict.pop("attrs")
+    return grid_dict
+
+
 def _regridder(
     grid_in: xr.Dataset, grid_out: xr.Dataset, method: str, **kwargs: Any
 ) -> xe.Regridder:
-    # Remove metadate and cache using dicts
-    dict_in = grid_in.cf[["longitude", "latitude"]].to_dict()
-    dict_in.pop("attrs")
-    dict_out = grid_out.cf[["longitude", "latitude"]].to_dict()
-    dict_out.pop("attrs")
-
+    # Remove metadata and cache using dicts
+    dict_in = _grid_to_dict(grid_in)
+    dict_out = _grid_to_dict(grid_out)
     kwargs["weights"] = _regridder_weights(dict_in, dict_out, method, **kwargs)
     return xe.Regridder(grid_in, grid_out, method, **kwargs)
 
