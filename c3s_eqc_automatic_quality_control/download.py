@@ -18,6 +18,7 @@ This module manages the execution of the quality control.
 # limitations under the License.
 
 import calendar
+import fnmatch
 import itertools
 import logging
 import pathlib
@@ -26,7 +27,9 @@ from typing import Any
 
 import cacholote
 import cads_toolbox
+import emohawk.readers.directory
 import pandas as pd
+import tqdm
 import xarray as xr
 
 from . import dashboard
@@ -284,35 +287,75 @@ def split_request(
     return requests
 
 
-def expand_dim_using_source(ds: xr.Dataset) -> xr.Dataset:
+def preprocess_satellite(ds: xr.Dataset) -> xr.Dataset:
     # TODO: workaround beacuse the toolbox is not able to open satellite datasets
     if source := ds.encoding.get("source"):
         ds = ds.expand_dims(source=[pathlib.Path(source).stem])
     return ds
 
 
-@cacholote.cacheable
-def download_and_transform_chunk(
+def get_source(
     collection_id: str,
-    request: dict[str, Any],
-    transform_func: Callable[..., xr.Dataset] | None = None,
-    **kwargs: Any,
+    request_list: list[dict[str, Any]],
+    exclude: list[str] = ["*.png", "*.json"],
+) -> list[str]:
+    source: set[str] = set()
+
+    for request in tqdm.tqdm(request_list) if len(request_list) > 1 else request_list:
+        data = cads_toolbox.catalogue.retrieve(collection_id, request).data
+        if content := getattr(data, "_content", None):
+            source.update(map(str, content))
+        else:
+            source.add(str(data.source))
+
+    for pattern in exclude:
+        source -= set(fnmatch.filter(source, pattern))
+    return list(source)
+
+
+def postprocess(
+    ds: xr.Dataset,
+    transform_func: Callable[..., xr.Dataset] | None,
+    **transform_func_kwargs: Any,
 ) -> xr.Dataset:
-    remote = cads_toolbox.catalogue.retrieve(collection_id, request)
-    to_xarray_kwargs = dict(TO_XARRAY_KWARGS)
-    if collection_id.startswith("satellite-"):
-        to_xarray_kwargs.setdefault("xarray_open_mfdataset_kwargs", {})
-        to_xarray_kwargs["xarray_open_mfdataset_kwargs"][
-            "preprocess"
-        ] = expand_dim_using_source
-    ds: xr.Dataset = remote.to_xarray(**to_xarray_kwargs)
+
     # TODO: workaround: cgul should make bounds coordinates
     bounds = set(sum(ds.cf.bounds.values(), []))
     ds = ds.set_coords(bounds)
     # TODO: make cacholote add coordinates? Needed to guarantee roundtrip
     # See: https://docs.xarray.dev/en/stable/user-guide/io.html#coordinates
     ds.attrs["coordinates"] = " ".join([str(coord) for coord in ds.coords])
-    return transform_func(ds, **kwargs) if transform_func else ds
+
+    return (
+        transform_func(ds, **transform_func_kwargs)
+        if transform_func is not None
+        else ds
+    )
+
+
+def get_data(source: list[str]) -> Any:
+    # TODO: emohawk not able to open a list of files
+    if len(source) == 1:
+        return emohawk.open(source[0])
+
+    emohwak_dir = emohawk.readers.directory.DirectoryReader("")
+    emohwak_dir._content = source
+    return emohwak_dir
+
+
+def _download_and_transform_requests(
+    collection_id: str,
+    request_list: list[dict[str, Any]],
+    transform_func: Callable[..., xr.Dataset] | None,
+    transform_func_kwargs: dict[str, Any],
+    **open_mfdataset_kwargs: Any,
+) -> xr.Dataset:
+
+    data = get_data(get_source(collection_id, request_list))
+    ds = data.to_xarray(
+        **TO_XARRAY_KWARGS, xarray_open_mfdataset_kwargs=open_mfdataset_kwargs
+    )
+    return postprocess(ds, transform_func, **transform_func_kwargs)
 
 
 def download_and_transform(
@@ -322,8 +365,9 @@ def download_and_transform(
     split_all: bool = False,
     transform_func: Callable[..., xr.Dataset] | None = None,
     transform_func_kwargs: dict[str, Any] = {},
+    transform_chunks: bool = True,
     logger: logging.Logger | None = None,
-    **kwargs: Any,
+    **open_mfdataset_kwargs: Any,
 ) -> xr.Dataset:
     """
     Download chunking along the selected parameters, apply the function f to each chunk and merge the results.
@@ -342,7 +386,9 @@ def download_and_transform(
         Function to apply to each single chunk
     transform_func_kwargs: dict
         Kwargs to be passed on to `transform_func`
-    **kwargs:
+    transform_chunks: bool
+        Whether to transform and cache each chunk or the whole dataset
+    **open_mfdataset_kwargs:
         Kwargs to be passed on to xr.open_mfdataset
 
     Returns
@@ -351,20 +397,45 @@ def download_and_transform(
     """
     logger = logger or LOGGER
 
+    # Open mfdataset kwargs
+    defaults: dict[str, Any] = {
+        "chunks": {},
+        "preprocess": preprocess_satellite
+        if collection_id.startswith("satellite-")
+        else None,
+    }
+    for key, value in defaults.items():
+        open_mfdataset_kwargs.setdefault(key, value)
+
+    # Cache results
+    download_and_transform_requests = _download_and_transform_requests
+    if transform_func is not None:
+        download_and_transform_requests = cacholote.cacheable(
+            download_and_transform_requests
+        )
+
+    # Split requests
     request_list = []
     for request in ensure_list(requests):
         request_list.extend(split_request(request, chunks, split_all))
 
-    datasets = []
-    for n, request_chunk in enumerate(request_list):
-        logger.info(f"Gathering file {n+1} out of {len(request_list)}...")
-        ds = download_and_transform_chunk(
+    if not transform_chunks or transform_func is None:
+        return download_and_transform_requests(
             collection_id,
-            request=request_chunk,
-            transform_func=transform_func,
-            **transform_func_kwargs,
+            request_list,
+            transform_func,
+            transform_func_kwargs,
+            **open_mfdataset_kwargs,
         )
-        datasets.append(ds.encoding["source"])
 
-    logger.info("Aggregating data...")
-    return xr.open_mfdataset(datasets, **kwargs)
+    sources = []
+    for request in tqdm.tqdm(request_list):
+        ds = download_and_transform_requests(
+            collection_id,
+            [request],
+            transform_func,
+            transform_func_kwargs,
+            **open_mfdataset_kwargs,
+        )
+        sources.append(ds.encoding["source"])
+    return xr.open_mfdataset(sources, **open_mfdataset_kwargs)
