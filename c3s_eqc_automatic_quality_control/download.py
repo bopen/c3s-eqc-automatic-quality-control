@@ -413,6 +413,9 @@ def download_and_transform(
             ds = original_preprocess(preprocess_satellite(ds))
             return ds
 
+    else:
+        preprocess = original_preprocess
+
     # Cache results
     download_and_transform_requests = _download_and_transform_requests
     if transform_func is not None:
