@@ -27,6 +27,7 @@ from typing import Any
 
 import cacholote
 import cads_toolbox
+import cf_xarray  # noqa: F401
 import emohawk.readers.directory
 import pandas as pd
 import tqdm
@@ -289,8 +290,8 @@ def split_request(
 
 def preprocess_satellite(ds: xr.Dataset) -> xr.Dataset:
     # TODO: workaround because the toolbox is not able to open satellite datasets
-    if source := ds.encoding.get("source"):
-        ds = ds.expand_dims(source=[pathlib.Path(source).stem])
+    if "time" not in ds.cf and "source" in ds.encoding:
+        ds = ds.expand_dims(source=[pathlib.Path(ds.encoding["source"]).stem])
     return ds
 
 
@@ -401,15 +402,16 @@ def download_and_transform(
     """
     logger = logger or LOGGER
 
-    # Open mfdataset kwargs
-    defaults: dict[str, Any] = {
-        "chunks": {},
-        "preprocess": preprocess_satellite
-        if collection_id.startswith("satellite-")
-        else None,
-    }
-    for key, value in defaults.items():
-        open_mfdataset_kwargs.setdefault(key, value)
+    # Handle satellite data
+    original_preprocess = open_mfdataset_kwargs.pop("preprocess", None)
+    if collection_id.startswith("satellite-"):
+
+        def preprocess(ds: xr.Dataset) -> xr.Dataset:
+            ds = preprocess_satellite(ds)
+            if original_preprocess is None:
+                return ds
+            ds = original_preprocess(preprocess_satellite(ds))
+            return ds
 
     # Cache results
     download_and_transform_requests = _download_and_transform_requests
@@ -429,6 +431,7 @@ def download_and_transform(
             request_list,
             transform_func,
             transform_func_kwargs,
+            preprocess=preprocess,
             **open_mfdataset_kwargs,
         )
 
@@ -439,7 +442,10 @@ def download_and_transform(
             [request],
             transform_func,
             transform_func_kwargs,
+            preprocess=preprocess,
             **open_mfdataset_kwargs,
         )
         sources.append(ds.encoding["source"])
-    return xr.open_mfdataset(sources, **open_mfdataset_kwargs)
+    return xr.open_mfdataset(
+        sources, preprocess=original_preprocess, **open_mfdataset_kwargs
+    )
