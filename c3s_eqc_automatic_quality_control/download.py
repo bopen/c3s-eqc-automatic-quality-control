@@ -288,7 +288,7 @@ def split_request(
 
 
 def preprocess_satellite(ds: xr.Dataset) -> xr.Dataset:
-    # TODO: workaround beacuse the toolbox is not able to open satellite datasets
+    # TODO: workaround because the toolbox is not able to open satellite datasets
     if source := ds.encoding.get("source"):
         ds = ds.expand_dims(source=[pathlib.Path(source).stem])
     return ds
@@ -370,7 +370,11 @@ def download_and_transform(
     **open_mfdataset_kwargs: Any,
 ) -> xr.Dataset:
     """
-    Download chunking along the selected parameters, apply the function f to each chunk and merge the results.
+    Download and transform data caching the results.
+
+    Datasets are chunked along the parameters specified by `chunks`.
+    If `transform_chunks` is True, the transform function is applied to each chunk.
+    Otherwise, the transform function is applied to the whole dataset after merging all chunks.
 
     Parameters
     ----------
