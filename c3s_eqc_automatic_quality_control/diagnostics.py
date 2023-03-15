@@ -94,7 +94,7 @@ def spatial_weighted_mean(
     Parameters
     ----------
     obj: xr.Dataset or xr.DataArray
-        Input data on which to apply the spatial mean
+        Input data
     lon: str, optional
         Name of longitude coordinate
     lat: str, optional
@@ -117,7 +117,7 @@ def seasonal_weighted_mean(obj: xr.Dataset, time: str | None = None) -> xr.Datas
     Parameters
     ----------
     obj: xr.Dataset
-        Input data on which to apply the seasonal mean
+        Input data
     time: str, optional
         Name of time coordinate
 
@@ -145,7 +145,7 @@ def annual_weighted_mean(obj: xr.Dataset, time: str | None = None) -> xr.Dataset
     Parameters
     ----------
     obj: xr.Dataset
-        Input data on which to apply the annual mean
+        Input data
     time: str, optional
         Name of time coordinate
 
@@ -175,7 +175,7 @@ def spatial_weighted_std(
     Parameters
     ----------
     obj: xr.Dataset or xr.DataArray
-        Input data on which to apply the spatial mean
+        Input data
     lon: str, optional
         Name of longitude coordinate
     lat: str, optional
@@ -189,3 +189,28 @@ def spatial_weighted_std(
     with xr.set_options(keep_attrs=True):  # type: ignore[no-untyped-call]
         weights = _spatial_weights(obj, lon, lat)
         return obj.weighted(weights).std((lon, lat))
+
+
+def spatial_weighted_median(
+    obj: xr.Dataset | xr.DataArray, lon: str | None = None, lat: str | None = None
+) -> xr.Dataset | xr.DataArray:
+    """
+    Calculate spatial median of ds with latitude weighting.
+
+    Parameters
+    ----------
+    obj: xr.Dataset or xr.DataArray
+        Input data
+    lon: str, optional
+        Name of longitude coordinate
+    lat: str, optional
+        Name of latitude coordinate
+
+    Returns
+    -------
+    reduced object
+    """
+    lon, lat = _get_lon_and_lat(obj, lon, lat)
+    with xr.set_options(keep_attrs=True):  # type: ignore[no-untyped-call]
+        weights = _spatial_weights(obj, lon, lat)
+        return obj.weighted(weights).quantile(0.5, dim=(lon, lat))

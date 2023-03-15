@@ -192,12 +192,13 @@ def global_map(da: xr.DataArray, **kwargs: Any) -> GeoQuadMesh | FacetGrid[Any]:
         stats = {
             "mean": diagnostics.spatial_weighted_mean(da),
             "std": diagnostics.spatial_weighted_std(da),
+            "median": diagnostics.spatial_weighted_median(da),
             "min": da.min(),
             "max": da.max(),
         }
         txt = "\n".join(
             [
-                f"{k:>4}: {v.squeeze().values:f} {da.attrs.get('units', '')}"
+                f"{k:>6}: {v.squeeze().values:f} {da.attrs.get('units', '')}"
                 for k, v in stats.items()
             ]
         )
