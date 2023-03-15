@@ -188,18 +188,17 @@ def global_map(da: xr.DataArray, **kwargs: Any) -> GeoQuadMesh | FacetGrid[Any]:
         p.axes.coastlines()
         p.axes.gridlines()
 
-        # Add stats
-        stats = {
-            "mean": diagnostics.spatial_weighted_mean(da),
-            "std": diagnostics.spatial_weighted_std(da),
-            "median": diagnostics.spatial_weighted_median(da),
-            "min": da.min(),
-            "max": da.max(),
-        }
+        # Compute statistics
+        dataarrays = [diagnostics.spatial_weighted_statistics(da)]
+        for stat in "min", "max":
+            dataarrays.append(getattr(da, stat)().expand_dims(statistic=[stat]))
+        da_stats = xr.merge(dataarrays)[da.name]
+
+        # Add statistics box
         txt = "\n".join(
             [
-                f"{k:>6}: {v.squeeze().values:f} {da.attrs.get('units', '')}"
-                for k, v in stats.items()
+                f"{k:>10}: {v.squeeze().values:f} {da.attrs.get('units', '')}"
+                for k, v in da_stats.groupby("statistic")
             ]
         )
         plt.figtext(

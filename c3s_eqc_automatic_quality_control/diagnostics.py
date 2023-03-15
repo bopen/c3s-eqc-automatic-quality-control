@@ -214,3 +214,19 @@ def spatial_weighted_median(
     with xr.set_options(keep_attrs=True):  # type: ignore[no-untyped-call]
         weights = _spatial_weights(obj, lon, lat)
         return obj.weighted(weights).quantile(0.5, dim=(lon, lat))
+
+
+def spatial_weighted_statistics(
+    obj: xr.Dataset | xr.DataArray, lon: str | None = None, lat: str | None = None
+) -> xr.Dataset | xr.DataArray:
+    objects = []
+    for func in (spatial_weighted_mean, spatial_weighted_std, spatial_weighted_median):
+        objects.append(
+            func(obj, lon, lat).expand_dims(
+                statistic=[func.__name__.replace("spatial_weighted_", "")]
+            )
+        )
+    ds = xr.merge(objects)
+    if isinstance(obj, xr.DataArray):
+        return ds[obj.name]
+    return ds
