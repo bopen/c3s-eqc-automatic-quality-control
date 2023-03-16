@@ -28,8 +28,16 @@ ERA5_REQUEST = (
 
 def test_weighted_diagnostics() -> None:
     ds_era5 = download.download_and_transform(*ERA5_REQUEST)
-    assert dict(diagnostics.spatial_weighted_mean(ds_era5).sizes) == {"time": 1}
-    assert dict(diagnostics.spatial_weighted_std(ds_era5).sizes) == {"time": 1}
+
+    assert dict(diagnostics.spatial_weighted_statistics(ds_era5).sizes) == {
+        "time": 1,
+        "diagnostic": 3,
+    }
+    assert dict(diagnostics.spatial_weighted_errors(ds_era5, ds_era5).sizes) == {
+        "time": 1,
+        "diagnostic": 3,
+    }
+
     assert dict(diagnostics.seasonal_weighted_mean(ds_era5).sizes) == {
         "longitude": 1440,
         "latitude": 721,

@@ -194,14 +194,14 @@ def projected_map(
         # Compute statistics
         dataarrays = [diagnostics.spatial_weighted_statistics(da)]
         for stat in "min", "max":
-            dataarrays.append(getattr(da, stat)().expand_dims(statistic=[stat]))
+            dataarrays.append(getattr(da, stat)().expand_dims(diagnostic=[stat]))
         da_stats = xr.merge(dataarrays)[da.name]
 
         # Add statistics box
         txt = "\n".join(
             [
                 f"{k:>10}: {v.squeeze().values:f} {da.attrs.get('units', '')}"
-                for k, v in da_stats.groupby("statistic")
+                for k, v in da_stats.groupby("diagnostic")
             ]
         )
         plt.figtext(

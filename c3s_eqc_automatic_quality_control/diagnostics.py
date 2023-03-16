@@ -228,7 +228,7 @@ def spatial_weighted_statistics(
     for func in (spatial_weighted_mean, spatial_weighted_std, spatial_weighted_median):
         objects.append(
             func(obj, lon, lat).expand_dims(
-                statistic=[func.__name__.replace("spatial_weighted_", "")]
+                diagnostic=[func.__name__.replace("spatial_weighted_", "")]
             )
         )
     ds = xr.merge(objects)
@@ -354,7 +354,7 @@ def spatial_weighted_errors(
     for func in (spatial_weighted_rmse, spatial_weighted_crmse, spatial_weighted_corr):
         objects.append(
             func(obj1, obj2, lon, lat).expand_dims(
-                statistic=[func.__name__.replace("spatial_weighted_", "")]
+                diagnostic=[func.__name__.replace("spatial_weighted_", "")]
             )
         )
     ds = xr.merge(objects)
