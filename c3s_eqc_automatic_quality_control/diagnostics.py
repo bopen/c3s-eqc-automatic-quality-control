@@ -24,15 +24,7 @@ import numpy as np
 import xarray as xr
 import xesmf as xe
 
-
-def _get_lon_and_lat(
-    obj: xr.Dataset | xr.DataArray, lon: str | None, lat: str | None
-) -> tuple[str, str]:
-    if lon is None:
-        (lon,) = obj.cf.coordinates["longitude"]
-    if lat is None:
-        (lat,) = obj.cf.coordinates["latitude"]
-    return lon, lat
+from . import utils
 
 
 def _get_time(obj: xr.Dataset | xr.DataArray, time: str | None) -> str:
@@ -44,7 +36,7 @@ def _get_time(obj: xr.Dataset | xr.DataArray, time: str | None) -> str:
 def _spatial_weights(
     obj: xr.Dataset | xr.DataArray, lon: str | None = None, lat: str | None = None
 ) -> xr.DataArray:
-    lon, lat = _get_lon_and_lat(obj, lon, lat)
+    lon, lat = utils._get_lon_and_lat(obj, lon, lat)
     cos = np.cos(np.deg2rad(obj[lat]))
     weights: xr.DataArray = cos / (cos.sum(lat) * len(obj[lon]))
     return weights
@@ -85,31 +77,6 @@ def regrid(
     return obj
 
 
-def spatial_weighted_mean(
-    obj: xr.Dataset | xr.DataArray, lon: str | None = None, lat: str | None = None
-) -> xr.Dataset | xr.DataArray:
-    """
-    Calculate spatial mean of ds with latitude weighting.
-
-    Parameters
-    ----------
-    obj: xr.Dataset or xr.DataArray
-        Input data on which to apply the spatial mean
-    lon: str, optional
-        Name of longitude coordinate
-    lat: str, optional
-        Name of latitude coordinate
-
-    Returns
-    -------
-    reduced object
-    """
-    lon, lat = _get_lon_and_lat(obj, lon, lat)
-    with xr.set_options(keep_attrs=True):  # type: ignore[no-untyped-call]
-        weights = _spatial_weights(obj, lon, lat)
-        return obj.weighted(weights).mean((lon, lat))
-
-
 def seasonal_weighted_mean(obj: xr.Dataset, time: str | None = None) -> xr.Dataset:
     """
     Calculate seasonal weighted mean.
@@ -117,7 +84,7 @@ def seasonal_weighted_mean(obj: xr.Dataset, time: str | None = None) -> xr.Datas
     Parameters
     ----------
     obj: xr.Dataset
-        Input data on which to apply the seasonal mean
+        Input data
     time: str, optional
         Name of time coordinate
 
@@ -145,7 +112,7 @@ def annual_weighted_mean(obj: xr.Dataset, time: str | None = None) -> xr.Dataset
     Parameters
     ----------
     obj: xr.Dataset
-        Input data on which to apply the annual mean
+        Input data
     time: str, optional
         Name of time coordinate
 
@@ -166,26 +133,231 @@ def annual_weighted_mean(obj: xr.Dataset, time: str | None = None) -> xr.Dataset
     return obj
 
 
-def spatial_weighted_std(
+def _spatial_weighted_reduction(
+    obj: xr.Dataset | xr.DataArray,
+    func: str,
+    lon: str | None = None,
+    lat: str | None = None,
+    **kwargs: Any,
+) -> xr.Dataset | xr.DataArray:
+    lon, lat = utils._get_lon_and_lat(obj, lon, lat)
+    with xr.set_options(keep_attrs=True):  # type: ignore[no-untyped-call]
+        weights = _spatial_weights(obj, lon, lat)
+        obj = getattr(obj.weighted(weights), func)(dim=(lon, lat), **kwargs)
+    return obj
+
+
+def spatial_weighted_mean(
     obj: xr.Dataset | xr.DataArray, lon: str | None = None, lat: str | None = None
 ) -> xr.Dataset | xr.DataArray:
     """
-    Calculate spatial std of ds with latitude weighting.
+    Calculate spatial mean of ds with latitude weighting.
 
     Parameters
     ----------
     obj: xr.Dataset or xr.DataArray
-        Input data on which to apply the spatial mean
-    lon: str, optional
-        Name of longitude coordinate
-    lat: str, optional
-        Name of latitude coordinate
+        Input data
+    lon, lat: str, optional
+        Name of longitude/latitude coordinate
 
     Returns
     -------
     reduced object
     """
-    lon, lat = _get_lon_and_lat(obj, lon, lat)
+    return _spatial_weighted_reduction(obj, "mean", lon, lat)
+
+
+def spatial_weighted_std(
+    obj: xr.Dataset | xr.DataArray, lon: str | None = None, lat: str | None = None
+) -> xr.Dataset | xr.DataArray:
+    """
+    Calculate spatial std with latitude weighting.
+
+    Parameters
+    ----------
+    obj: xr.Dataset or xr.DataArray
+        Input data
+    lon, lat: str, optional
+        Name of longitude/latitude coordinate
+
+    Returns
+    -------
+    reduced object
+    """
+    return _spatial_weighted_reduction(obj, "std", lon, lat)
+
+
+def spatial_weighted_median(
+    obj: xr.Dataset | xr.DataArray, lon: str | None = None, lat: str | None = None
+) -> xr.Dataset | xr.DataArray:
+    """
+    Calculate spatial median with latitude weighting.
+
+    Parameters
+    ----------
+    obj: xr.Dataset or xr.DataArray
+        Input data
+    lon, lat: str, optional
+        Name of longitude/latitude coordinate
+
+    Returns
+    -------
+    reduced object
+    """
+    return _spatial_weighted_reduction(obj, "quantile", lon, lat, q=0.5)
+
+
+def spatial_weighted_statistics(
+    obj: xr.Dataset | xr.DataArray, lon: str | None = None, lat: str | None = None
+) -> xr.Dataset | xr.DataArray:
+    """
+    Calculate spatial mean, std, and median with latitude weighting.
+
+    Parameters
+    ----------
+    obj: xr.Dataset or xr.DataArray
+        Input data
+    lon, lat: str, optional
+        Name of longitude/latitude coordinate
+
+    Returns
+    -------
+    reduced object
+    """
+    objects = []
+    for func in (spatial_weighted_mean, spatial_weighted_std, spatial_weighted_median):
+        objects.append(
+            func(obj, lon, lat).expand_dims(
+                diagnostic=[func.__name__.replace("spatial_weighted_", "")]
+            )
+        )
+    ds = xr.merge(objects)
+    if isinstance(obj, xr.DataArray):
+        return ds[obj.name]
+    return ds
+
+
+def _spatial_weighted_rmse(
+    obj1: xr.Dataset | xr.DataArray,
+    obj2: xr.Dataset | xr.DataArray,
+    lon: str | None = None,
+    lat: str | None = None,
+    centralise: bool = False,
+) -> xr.Dataset | xr.DataArray:
+    lon, lat = utils._get_lon_and_lat(obj1, lon, lat)
     with xr.set_options(keep_attrs=True):  # type: ignore[no-untyped-call]
-        weights = _spatial_weights(obj, lon, lat)
-        return obj.weighted(weights).std((lon, lat))
+        weights = _spatial_weights(obj1, lon, lat)
+        if centralise:
+            obj1 -= spatial_weighted_mean(obj1)
+            obj2 -= spatial_weighted_mean(obj2)
+        obj = (obj1 - obj2) ** 2
+        return obj.weighted(weights).mean((lon, lat)) ** 0.5
+
+
+def spatial_weighted_rmse(
+    obj1: xr.Dataset | xr.DataArray,
+    obj2: xr.Dataset | xr.DataArray,
+    lon: str | None = None,
+    lat: str | None = None,
+) -> xr.Dataset | xr.DataArray:
+    """
+    Calculate spatial rmse with latitude weighting.
+
+    Parameters
+    ----------
+    obj1, obj2: xr.Dataset or xr.DataArray
+        Input data
+    lon, lat: str, optional
+        Name of longitude/latitude coordinate
+
+    Returns
+    -------
+    reduced object
+    """
+    return _spatial_weighted_rmse(obj1, obj2, lon, lat, centralise=False)
+
+
+def spatial_weighted_crmse(
+    obj1: xr.Dataset | xr.DataArray,
+    obj2: xr.Dataset | xr.DataArray,
+    lon: str | None = None,
+    lat: str | None = None,
+) -> xr.Dataset | xr.DataArray:
+    """
+    Calculate spatial crmse with latitude weighting.
+
+    Parameters
+    ----------
+    obj1, obj2: xr.Dataset or xr.DataArray
+        Input data
+    lon, lat: str, optional
+        Name of longitude/latitude coordinate
+
+    Returns
+    -------
+    reduced object
+    """
+    return _spatial_weighted_rmse(obj1, obj2, lon, lat, centralise=True)
+
+
+def spatial_weighted_corr(
+    obj1: xr.Dataset | xr.DataArray,
+    obj2: xr.Dataset | xr.DataArray,
+    lon: str | None = None,
+    lat: str | None = None,
+) -> xr.Dataset | xr.DataArray:
+    """
+    Calculate spatial correlation with latitude weighting.
+
+    Parameters
+    ----------
+    obj1, obj2: xr.Dataset or xr.DataArray
+        Input data
+    lon, lat: str, optional
+        Name of longitude/latitude coordinate
+
+    Returns
+    -------
+    reduced object
+    """
+    lon, lat = utils._get_lon_and_lat(obj1, lon, lat)
+    with xr.set_options(keep_attrs=True):  # type: ignore[no-untyped-call]
+        weights = _spatial_weights(obj1, lon, lat)
+        obj1c = obj1 - spatial_weighted_mean(obj1)
+        obj2c = obj2 - spatial_weighted_mean(obj2)
+        num = (obj1c * obj2c).weighted(weights).mean((lon, lat))
+        den = spatial_weighted_std(obj1) * spatial_weighted_std(obj2)
+        return num / den
+
+
+def spatial_weighted_errors(
+    obj1: xr.Dataset | xr.DataArray,
+    obj2: xr.Dataset | xr.DataArray,
+    lon: str | None = None,
+    lat: str | None = None,
+) -> xr.Dataset | xr.DataArray:
+    """
+    Calculate rmse, crmse, and correlation with latitude weighting.
+
+    Parameters
+    ----------
+    obj1, obj2: xr.Dataset or xr.DataArray
+        Input data
+    lon, lat: str, optional
+        Name of longitude/latitude coordinate
+
+    Returns
+    -------
+    reduced object
+    """
+    objects = []
+    for func in (spatial_weighted_rmse, spatial_weighted_crmse, spatial_weighted_corr):
+        objects.append(
+            func(obj1, obj2, lon, lat).expand_dims(
+                diagnostic=[func.__name__.replace("spatial_weighted_", "")]
+            )
+        )
+    ds = xr.merge(objects)
+    if isinstance(obj1, xr.DataArray):
+        return ds[obj1.name]
+    return ds

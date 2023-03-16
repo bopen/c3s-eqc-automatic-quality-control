@@ -62,7 +62,6 @@ def shaded_std(
     title: str | None = None,
     x_dim: str = "time",
 ) -> go.Figure:
-
     if isinstance(vars, str):
         vars = [vars]
     if hue_dim:
@@ -157,13 +156,17 @@ levels = range(-30, 31, 5)
 colormap = "YlOrRd"
 
 
-def global_map(da: xr.DataArray, **kwargs: Any) -> GeoQuadMesh | FacetGrid[Any]:
-    """Plot global map.
+def projected_map(
+    da: xr.DataArray, projection: ccrs.Projection = ccrs.Robinson(), **kwargs: Any
+) -> GeoQuadMesh | FacetGrid[Any]:
+    """Plot projected map.
 
     Parameters
     ----------
     da: DataArray
         DataArray to plot
+    projection: ccrs.Projection
+        Projection for the plot
     **kwargs:
         Keyword arguments for `da.plot`
 
@@ -173,7 +176,7 @@ def global_map(da: xr.DataArray, **kwargs: Any) -> GeoQuadMesh | FacetGrid[Any]:
     """
     # Set defaults
     subplot_kws = kwargs.setdefault("subplot_kws", dict())
-    subplot_kws.setdefault("projection", ccrs.Robinson())
+    subplot_kws.setdefault("projection", projection)
     kwargs.setdefault("transform", ccrs.PlateCarree())
 
     # Plot
@@ -186,19 +189,19 @@ def global_map(da: xr.DataArray, **kwargs: Any) -> GeoQuadMesh | FacetGrid[Any]:
             ax.gridlines()
     else:
         p.axes.coastlines()
-        p.axes.gridlines()
+        p.axes.gridlines(draw_labels=True)
 
-        # Add stats
-        stats = {
-            "mean": diagnostics.spatial_weighted_mean(da),
-            "std": diagnostics.spatial_weighted_std(da),
-            "min": da.min(),
-            "max": da.max(),
-        }
+        # Compute statistics
+        dataarrays = [diagnostics.spatial_weighted_statistics(da)]
+        for stat in "min", "max":
+            dataarrays.append(getattr(da, stat)().expand_dims(diagnostic=[stat]))
+        da_stats = xr.merge(dataarrays)[da.name]
+
+        # Add statistics box
         txt = "\n".join(
             [
-                f"{k:>4}: {v.squeeze().values:f} {da.attrs.get('units', '')}"
-                for k, v in stats.items()
+                f"{k:>10}: {v.squeeze().values:f} {da.attrs.get('units', '')}"
+                for k, v in da_stats.groupby("diagnostic")
             ]
         )
         plt.figtext(
