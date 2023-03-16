@@ -5,7 +5,6 @@ from c3s_eqc_automatic_quality_control import download
 
 
 def test_split_request() -> None:
-
     request = {
         "product_type": "reanalysis",
         "format": "grib",
@@ -55,7 +54,6 @@ def test_split_request() -> None:
 
 
 def test_build_chunks() -> None:
-
     values = list(range(11))
 
     res = download.build_chunks(values, 1)
@@ -69,7 +67,6 @@ def test_build_chunks() -> None:
 
 
 def test_check_non_empty_date() -> None:
-
     request = {
         "year": "2021",
         "month": ["01", "02", "03"],
@@ -104,7 +101,6 @@ def test_check_non_empty_date() -> None:
 
 
 def test_floor_to_month() -> None:
-
     date = pd.Period("2022-12", freq="M")
     res = download.floor_to_month(date, 1)
 
@@ -127,7 +123,6 @@ def test_floor_to_month() -> None:
 
 
 def test_extract_leading_months() -> None:
-
     start = pd.Period("2020-06", freq="M")
     stop = pd.Period("2023-06", freq="M")
     res = download.extract_leading_months(start, stop)
@@ -169,7 +164,6 @@ def test_extract_leading_months() -> None:
 
 
 def test_extract_trailing_months() -> None:
-
     start = pd.Period("2020-06", freq="M")
     stop = pd.Period("2023-06", freq="M")
     res = download.extract_trailing_months(start, stop)
@@ -209,7 +203,6 @@ def test_extract_trailing_months() -> None:
 
 
 def test_extract_years() -> None:
-
     start = pd.Period("2020-06", freq="M")
     stop = pd.Period("2023-06", freq="M")
     res = download.extract_years(start, stop)
@@ -238,7 +231,6 @@ def test_extract_years() -> None:
 
 
 def test_update_request() -> None:
-
     requests = download.update_request_date({}, "2020-02", "2020-11")
     assert len(requests) == 1
 

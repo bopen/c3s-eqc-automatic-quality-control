@@ -60,7 +60,6 @@ def compute_stop_date(switch_month_day: int | None = None) -> pd.Period:
 
 
 def ceil_to_month(period: pd.Period, month: int = 1) -> pd.Period:
-
     if period.month > month:
         period = pd.Period(year=period.year + 1, month=month, freq="M")
     if period.month < month:
@@ -69,7 +68,6 @@ def ceil_to_month(period: pd.Period, month: int = 1) -> pd.Period:
 
 
 def floor_to_month(period: pd.Period, month: int = 1) -> pd.Period:
-
     if period.month > month:
         period = pd.Period(year=period.year, month=month, freq="M")
     if period.month < month:
@@ -79,7 +77,6 @@ def floor_to_month(period: pd.Period, month: int = 1) -> pd.Period:
 
 
 def extract_leading_months(start: pd.Period, stop: pd.Period) -> list[dict[str, Any]]:
-
     time_ranges = []
     if start.month > 1 and (start.year < stop.year or stop.month == 12):
         stop = min(stop, pd.Period(year=start.year, month=12, freq="M"))
@@ -97,7 +94,6 @@ def extract_leading_months(start: pd.Period, stop: pd.Period) -> list[dict[str, 
 
 
 def extract_trailing_months(start: pd.Period, stop: pd.Period) -> list[dict[str, Any]]:
-
     time_ranges = []
     if not stop.month == 12:
         start = max(start, floor_to_month(stop, month=1))
@@ -115,7 +111,6 @@ def extract_trailing_months(start: pd.Period, stop: pd.Period) -> list[dict[str,
 
 
 def extract_years(start: pd.Period, stop: pd.Period) -> list[dict[str, Any]]:
-
     start = ceil_to_month(start, month=1)
     stop = floor_to_month(stop, month=12)
     years = list(range(start.year, stop.year + 1))
@@ -201,7 +196,6 @@ def update_request_date(
 
 
 def ensure_list(obj: Any) -> list[Any]:
-
     if isinstance(obj, (list, tuple)):
         return list(obj)
     else:
@@ -226,7 +220,6 @@ def build_chunks(
     values: list[Any] | Any,
     chunks_size: int,
 ) -> list[list[Any]] | list[Any]:
-
     values = ensure_list(values)
     values.copy()
     if chunks_size == 1:
@@ -319,7 +312,6 @@ def postprocess(
     transform_func: Callable[..., xr.Dataset] | None,
     **transform_func_kwargs: Any,
 ) -> xr.Dataset:
-
     # TODO: workaround: cgul should make bounds coordinates
     bounds = set(sum(ds.cf.bounds.values(), []))
     ds = ds.set_coords(bounds)
@@ -351,7 +343,6 @@ def _download_and_transform_requests(
     transform_func_kwargs: dict[str, Any],
     **open_mfdataset_kwargs: Any,
 ) -> xr.Dataset:
-
     data = get_data(get_source(collection_id, request_list))
     ds = data.to_xarray(
         **TO_XARRAY_KWARGS, xarray_open_mfdataset_kwargs=open_mfdataset_kwargs

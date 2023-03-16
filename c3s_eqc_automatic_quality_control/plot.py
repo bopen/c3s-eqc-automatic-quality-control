@@ -62,7 +62,6 @@ def shaded_std(
     title: str | None = None,
     x_dim: str = "time",
 ) -> go.Figure:
-
     if isinstance(vars, str):
         vars = [vars]
     if hue_dim:
