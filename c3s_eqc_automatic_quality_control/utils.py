@@ -56,6 +56,6 @@ def regionalise(
             obj[lon_name] = (obj[lon_name] + 180) % 360 - 180
     else:
         with xr.set_options(keep_attrs=True):  # type: ignore[no-untyped-call]
-            obj[lon_name] %= 360
+            obj[lon_name] = obj[lon_name] % 360
     obj = obj.sortby([lon_name, lat_name])
     return obj.sel({lon_name: lon_slice, lat_name: lat_slice})
