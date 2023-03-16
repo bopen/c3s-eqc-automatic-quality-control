@@ -17,13 +17,13 @@ This module manages the command line interfaces.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List
 
 import rich
 import typer
 
 from . import cim, dashboard, runner
 
+REPO_URL = "https://github.com/bopen/c3s-eqc-toolbox-template.git"
 STATUSES = {
     "DONE": "[green]DONE[/]",
     "FAILED": "[red]FAILED[/]",
@@ -49,29 +49,28 @@ def show_diagnostics() -> None:
     rich.print(table)
 
 
-@app.command(name="show-config-template")
-def show_config_template() -> None:
-    """Show a template configuration file."""
-    rich.print(runner.TEMPLATE)
-
-
 @app.command()
 def run(
-    config_file: str,
-    target_dir: str = typer.Option(..., "--target-dir", "-t"),
+    notebook_path: str,
+    qar_id: str = typer.Option("000", "--qar-id", "-q"),
+    run_n: str = typer.Option("0", "--run-n", "-n"),
+    target_dir: str = typer.Option("rendered_notebooks", "--target-dir", "-t"),
 ) -> None:
-    """Run automatic quality checks and populate QAR."""
-    runner.run(config_file, target_dir)
+    """Run notebook."""
+    runner.run(
+        notebook_path=notebook_path, qar_id=qar_id, run_n=run_n, target_dir=target_dir
+    )
 
 
 @app.command(name="dashboard")
-def dasboard(
+def run_dashboard(
     qar_id: str = typer.Option(None, "--qar-id", "-q"),
     status: str = typer.Option(None, "--status", "-s"),
     limit: int = typer.Option(20, "--limit", "-l"),
 ) -> None:
     """Show status of launched processes."""
-    table = rich.table.Table("QAR ID", "RUN N.", "STATUS", "START", "STOP", "WORKDIR")
+    table = rich.table.Table("QAR ID", "RUN N.", "STATUS", "START", "STOP")
+    table.add_column("WORKDIR", overflow="fold")
     for (qar, run_n), info in dashboard.list_qars(qar_id, status, limit).items():
         table.add_row(
             qar,
@@ -87,31 +86,51 @@ def dasboard(
 @app.command(name="list-tasks")
 def list_task(
     base_url: str = typer.Option(cim.CIM, "--base-url", "-b"),
-    auth: str = typer.Option(None, "--auth", "-a"),
+    user: str = typer.Option(None, "--user", "-u"),
+    passwd: str = typer.Option(None, "--pass", "-p"),
 ) -> None:
     """List QAR tasks."""
-    if auth is None:
-        auth = cim.get_api_credentials()
-    res = cim.get_tasks(base_url, auth=auth)
+    if any([user, passwd]) is None:
+        user, passwd = cim.get_api_credentials()
+    res = cim.get_tasks(base_url, user=user, passwd=passwd)
     rich.print(res)
 
 
-@app.command(name="push")
+@app.command(name="push-notebook")
 def push(
-    task_id: str,
-    workdir: str = typer.Option(..., "--workdir", "-w"),
-    base_url: str = typer.Option(cim.CIM, "--base-url", "-b"),
-    auth: str = typer.Option(None, "--auth", "-a"),
+    notebook_paths: str,
+    repo_url: str = typer.Option(REPO_URL, "--repo", "-r"),
+    branch: str = typer.Option("notebooks", "--branch", "-b"),
+    user_dir: str = typer.Option("user", "--user", "-u"),
 ) -> None:
-    """Push image and relative info to a QAR task."""
-    if auth is None:
-        auth = cim.get_api_credentials()
-    cim.push_to_task(base_url, task_id, workdir, auth=auth)
+    """Push rendered notebooks."""
+    cim.push_notebooks(
+        notebook_paths=notebook_paths,
+        repo_url=repo_url,
+        branch=branch,
+        user_dir=user_dir,
+    )
+
+
+@app.command(name="push-qar")
+def push_qar(
+    workdir: str,
+    repo_url: str = typer.Option(REPO_URL, "--repo", "-r"),
+    branch: str = typer.Option("notebooks", "--branch", "-b"),
+    user_dir: str = typer.Option("user", "--user", "-u"),
+) -> None:
+    """Push all rendered notebooks in QAR working folder."""
+    cim.push_qar(
+        workdir=workdir,
+        repo_url=repo_url,
+        branch=branch,
+        user_dir=user_dir,
+    )
 
 
 @app.command(name="info")
 def info() -> None:
-    """Print info about EQC AQC installation"""
+    """Print info about EQC AQC installation."""
     etc = dashboard.ensure_log_dir()
     rich.print("LOG DIR:", etc)
 

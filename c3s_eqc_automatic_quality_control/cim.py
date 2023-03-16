@@ -17,12 +17,14 @@ This module offers interfaces with the CIM API.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import pathlib
 import os
-import requests
+import pathlib
+import shutil
+import tempfile
 from typing import Any, Tuple
-import yaml
 
+import git
+import requests
 
 API_USER_VAR_NAME = "EQC_AQC_API_USER"
 API_PWD_VAR_NAME = "EQC_AQC_API_PWD"
@@ -31,7 +33,7 @@ API_USER = None
 API_PWD = None
 
 
-def http_request(url, request="get", **kwargs):
+def http_request(url: str, request: str = "get", **kwargs: Any) -> requests.Response:
     method = getattr(requests, request)
     res = method(url, **kwargs)
     if res.status_code not in (200, 202):
@@ -39,7 +41,7 @@ def http_request(url, request="get", **kwargs):
     return res
 
 
-def get_api_credentials() -> list[str, str]:
+def get_api_credentials() -> Tuple[str, str]:
     global API_USER
     global API_PWD
     if API_USER is None and API_PWD is None:
@@ -53,53 +55,52 @@ def get_api_credentials() -> list[str, str]:
     return API_USER, API_PWD
 
 
-def get_tasks(
-    baseurl: str,
-    auth: Tuple
-) -> list:
+def get_tasks(baseurl: str, user: str, passwd: str) -> Any:
     endpoint = baseurl + "workflows/cds/tasks"
-    res = http_request(url=endpoint, auth=auth)
+    res = http_request(url=endpoint, auth=(user, passwd))
     return res.json().get("content")
 
 
-def push_image_to_task(
-    baseurl: str,
-    task_id: str,
-    image_path: str,
-    auth: Tuple
-) -> str:
-    contents = get_tasks(baseurl, auth)
-    if not contents:
-        raise ValueError("No open task available.")
-    endpoint = baseurl + f"workflows/cds/tasks/{task_id}/attachments"
-    with open(image_path, "rb") as f:
-        files = {"image": f.read()}
-    res = http_request(endpoint, "post", auth=auth, files=files)
-    return res.json().get("id")
+def push_notebooks(
+    notebook_paths: str | list[str], repo_url: str, branch: str, user_dir: str
+) -> None:
+    if isinstance(notebook_paths, str):
+        notebook_paths = [notebook_paths]
+
+    with tempfile.TemporaryDirectory() as tempdir:
+        # Clone the repository
+        repo = git.Repo.clone_from(repo_url, tempdir, branch=branch)
+
+        dest_dir = f"{tempdir}/rendered_notebooks/{user_dir}"
+        try:
+            os.makedirs(dest_dir)
+        except FileExistsError:
+            pass
+        executed = []
+        for nb in notebook_paths:
+            # Move the file to the folder
+            shutil.copy(pathlib.Path(nb).resolve(), dest_dir)
+
+            # Add the file
+            executed_nb = os.path.basename(nb)
+            executed.append(executed_nb)
+            repo.git.add(f"{dest_dir}/{executed_nb}")
+        commit_message = f"Add notebooks: {', '.join(executed)}"
+        # Commit the file
+        repo.index.commit(commit_message)
+
+        # Push the changes
+        origin = repo.remote(name="origin")
+        origin.push(refspec=f"{branch}:{branch}")
 
 
-def push_attrs_to_task(baseurl, task_id, metadata, auth) -> None:
-    headers = {
-        "Content-Type": "application/json",
-    }
-    endpoint = baseurl + f"workflows/cds/tasks/{task_id}/images"
-    json_data = {"images": metadata}
-    return http_request(endpoint, "post", auth=auth, headers=headers, json=json_data)
-
-
-def push_to_task(baseurl, task_id, workdir, auth):
-    im_paths = [str(im.absolute()) for im in pathlib.Path(workdir).glob("*.png")]
-    meta_paths = [str(meta.absolute()) for meta in pathlib.Path(workdir).glob("*.yml")]
-    if len(im_paths) != len(meta_paths):
-        raise ValueError(
-            f"n. of images {len(im_paths)} and n. of metadata {len(meta_paths)} do not match."
-        )
-    image_ids = [push_image_to_task(baseurl, task_id, im, auth) for im in im_paths]
-    print(f"image id-s: {image_ids}")
-    metadata = []
-    for image_id, meta in zip(image_ids, meta_paths):
-        with open(meta, "r") as f:
-            im_attrs = yaml.safe_load(f.read())
-            im_attrs.update({"imageId": image_id})
-            metadata.append(im_attrs)
-    return push_attrs_to_task(baseurl, task_id, metadata, auth)
+def push_qar(workdir: str, repo_url: str, branch: str, user_dir: str) -> None:
+    notebook_paths = [
+        str(nb.absolute()) for nb in pathlib.Path(workdir).glob("*.ipynb")
+    ]
+    push_notebooks(
+        notebook_paths=notebook_paths,
+        repo_url=repo_url,
+        branch=branch,
+        user_dir=user_dir,
+    )
