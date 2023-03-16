@@ -157,8 +157,10 @@ levels = range(-30, 31, 5)
 colormap = "YlOrRd"
 
 
-def global_map(da: xr.DataArray, **kwargs: Any) -> GeoQuadMesh | FacetGrid[Any]:
-    """Plot global map.
+def projected_map(
+    da: xr.DataArray, projection: ccrs.Projection = ccrs.Robinson(), **kwargs: Any
+) -> GeoQuadMesh | FacetGrid[Any]:
+    """Plot projected map.
 
     Parameters
     ----------
@@ -173,7 +175,7 @@ def global_map(da: xr.DataArray, **kwargs: Any) -> GeoQuadMesh | FacetGrid[Any]:
     """
     # Set defaults
     subplot_kws = kwargs.setdefault("subplot_kws", dict())
-    subplot_kws.setdefault("projection", ccrs.Robinson())
+    subplot_kws.setdefault("projection", projection)
     kwargs.setdefault("transform", ccrs.PlateCarree())
 
     # Plot
@@ -186,7 +188,7 @@ def global_map(da: xr.DataArray, **kwargs: Any) -> GeoQuadMesh | FacetGrid[Any]:
             ax.gridlines()
     else:
         p.axes.coastlines()
-        p.axes.gridlines()
+        p.axes.gridlines(draw_labels=True)
 
         # Compute statistics
         dataarrays = [diagnostics.spatial_weighted_statistics(da)]

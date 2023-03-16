@@ -24,15 +24,7 @@ import numpy as np
 import xarray as xr
 import xesmf as xe
 
-
-def _get_lon_and_lat(
-    obj: xr.Dataset | xr.DataArray, lon: str | None, lat: str | None
-) -> tuple[str, str]:
-    if lon is None:
-        (lon,) = obj.cf.coordinates["longitude"]
-    if lat is None:
-        (lat,) = obj.cf.coordinates["latitude"]
-    return lon, lat
+from . import utils
 
 
 def _get_time(obj: xr.Dataset | xr.DataArray, time: str | None) -> str:
@@ -44,7 +36,7 @@ def _get_time(obj: xr.Dataset | xr.DataArray, time: str | None) -> str:
 def _spatial_weights(
     obj: xr.Dataset | xr.DataArray, lon: str | None = None, lat: str | None = None
 ) -> xr.DataArray:
-    lon, lat = _get_lon_and_lat(obj, lon, lat)
+    lon, lat = utils._get_lon_and_lat(obj, lon, lat)
     cos = np.cos(np.deg2rad(obj[lat]))
     weights: xr.DataArray = cos / (cos.sum(lat) * len(obj[lon]))
     return weights
@@ -148,7 +140,7 @@ def _spatial_weighted_reduction(
     lat: str | None = None,
     **kwargs: Any,
 ) -> xr.Dataset | xr.DataArray:
-    lon, lat = _get_lon_and_lat(obj, lon, lat)
+    lon, lat = utils._get_lon_and_lat(obj, lon, lat)
     with xr.set_options(keep_attrs=True):  # type: ignore[no-untyped-call]
         weights = _spatial_weights(obj, lon, lat)
         obj = getattr(obj.weighted(weights), func)(dim=(lon, lat), **kwargs)
@@ -244,7 +236,7 @@ def _spatial_weighted_rmse(
     lat: str | None = None,
     centralise: bool = False,
 ) -> xr.Dataset | xr.DataArray:
-    lon, lat = _get_lon_and_lat(obj1, lon, lat)
+    lon, lat = utils._get_lon_and_lat(obj1, lon, lat)
     with xr.set_options(keep_attrs=True):  # type: ignore[no-untyped-call]
         weights = _spatial_weights(obj1, lon, lat)
         if centralise:
@@ -326,7 +318,7 @@ def spatial_weighted_corr(
     -------
     reduced object
     """
-    lon, lat = _get_lon_and_lat(obj1, lon, lat)
+    lon, lat = utils._get_lon_and_lat(obj1, lon, lat)
     with xr.set_options(keep_attrs=True):  # type: ignore[no-untyped-call]
         weights = _spatial_weights(obj1, lon, lat)
         obj1c = obj1 - spatial_weighted_mean(obj1)
