@@ -166,6 +166,8 @@ def projected_map(
     ----------
     da: DataArray
         DataArray to plot
+    projection: ccrs.Projection
+        Projection for the plot
     **kwargs:
         Keyword arguments for `da.plot`
 

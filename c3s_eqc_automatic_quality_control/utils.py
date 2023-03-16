@@ -33,6 +33,21 @@ def regionalise(
     lon_name: str | None = None,
     lat_name: str | None = None,
 ) -> xr.Dataset | xr.DataArray:
+    """Extract a region cutout.
+
+    Parameters
+    ----------
+    obj: xr.Dataset | xr.DataArray
+        Object to cut
+    lon_slice, lat_slice: slice
+        Coordinate slices defining the region to cutout
+    lon_name, lat_name: str
+        Name of longitude/latitude coordinate
+
+    Returns
+    -------
+    Cutout object
+    """
     lon_name, lat_name = _get_lon_and_lat(obj, lon_name, lat_name)
     if lon_slice.start is None and lon_slice.stop is None:
         pass

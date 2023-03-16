@@ -157,10 +157,8 @@ def spatial_weighted_mean(
     ----------
     obj: xr.Dataset or xr.DataArray
         Input data
-    lon: str, optional
-        Name of longitude coordinate
-    lat: str, optional
-        Name of latitude coordinate
+    lon, lat: str, optional
+        Name of longitude/latitude coordinate
 
     Returns
     -------
@@ -179,10 +177,8 @@ def spatial_weighted_std(
     ----------
     obj: xr.Dataset or xr.DataArray
         Input data
-    lon: str, optional
-        Name of longitude coordinate
-    lat: str, optional
-        Name of latitude coordinate
+    lon, lat: str, optional
+        Name of longitude/latitude coordinate
 
     Returns
     -------
@@ -201,10 +197,8 @@ def spatial_weighted_median(
     ----------
     obj: xr.Dataset or xr.DataArray
         Input data
-    lon: str, optional
-        Name of longitude coordinate
-    lat: str, optional
-        Name of latitude coordinate
+    lon, lat: str, optional
+        Name of longitude/latitude coordinate
 
     Returns
     -------
@@ -216,6 +210,20 @@ def spatial_weighted_median(
 def spatial_weighted_statistics(
     obj: xr.Dataset | xr.DataArray, lon: str | None = None, lat: str | None = None
 ) -> xr.Dataset | xr.DataArray:
+    """
+    Calculate spatial mean, std, and median with latitude weighting.
+
+    Parameters
+    ----------
+    obj: xr.Dataset or xr.DataArray
+        Input data
+    lon, lat: str, optional
+        Name of longitude/latitude coordinate
+
+    Returns
+    -------
+    reduced object
+    """
     objects = []
     for func in (spatial_weighted_mean, spatial_weighted_std, spatial_weighted_median):
         objects.append(
@@ -259,10 +267,8 @@ def spatial_weighted_rmse(
     ----------
     obj1, obj2: xr.Dataset or xr.DataArray
         Input data
-    lon: str, optional
-        Name of longitude coordinate
-    lat: str, optional
-        Name of latitude coordinate
+    lon, lat: str, optional
+        Name of longitude/latitude coordinate
 
     Returns
     -------
@@ -284,10 +290,8 @@ def spatial_weighted_crmse(
     ----------
     obj1, obj2: xr.Dataset or xr.DataArray
         Input data
-    lon: str, optional
-        Name of longitude coordinate
-    lat: str, optional
-        Name of latitude coordinate
+    lon, lat: str, optional
+        Name of longitude/latitude coordinate
 
     Returns
     -------
@@ -309,10 +313,8 @@ def spatial_weighted_corr(
     ----------
     obj1, obj2: xr.Dataset or xr.DataArray
         Input data
-    lon: str, optional
-        Name of longitude coordinate
-    lat: str, optional
-        Name of latitude coordinate
+    lon, lat: str, optional
+        Name of longitude/latitude coordinate
 
     Returns
     -------
@@ -334,7 +336,20 @@ def spatial_weighted_errors(
     lon: str | None = None,
     lat: str | None = None,
 ) -> xr.Dataset | xr.DataArray:
+    """
+    Calculate rmse, crmse, and correlation with latitude weighting.
 
+    Parameters
+    ----------
+    obj1, obj2: xr.Dataset or xr.DataArray
+        Input data
+    lon, lat: str, optional
+        Name of longitude/latitude coordinate
+
+    Returns
+    -------
+    reduced object
+    """
     objects = []
     for func in (spatial_weighted_rmse, spatial_weighted_crmse, spatial_weighted_corr):
         objects.append(
