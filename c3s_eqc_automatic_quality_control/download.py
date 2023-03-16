@@ -18,6 +18,7 @@ This module manages the execution of the quality control.
 # limitations under the License.
 
 import calendar
+import fnmatch
 import itertools
 import logging
 import pathlib
@@ -26,7 +27,10 @@ from typing import Any
 
 import cacholote
 import cads_toolbox
+import cf_xarray  # noqa: F401
+import emohawk.readers.directory
 import pandas as pd
+import tqdm
 import xarray as xr
 
 from . import dashboard
@@ -34,9 +38,9 @@ from . import dashboard
 cads_toolbox.config.USE_CACHE = True
 
 LOGGER = dashboard.get_logger()
+
+
 # In the future, this kwargs should somehow be handle upstream by the toolbox.
-
-
 TO_XARRAY_KWARGS: dict[str, Any] = {
     "harmonise": True,
     "pandas_read_csv_kwargs": {"comment": "#"},
@@ -56,7 +60,6 @@ def compute_stop_date(switch_month_day: int | None = None) -> pd.Period:
 
 
 def ceil_to_month(period: pd.Period, month: int = 1) -> pd.Period:
-
     if period.month > month:
         period = pd.Period(year=period.year + 1, month=month, freq="M")
     if period.month < month:
@@ -65,7 +68,6 @@ def ceil_to_month(period: pd.Period, month: int = 1) -> pd.Period:
 
 
 def floor_to_month(period: pd.Period, month: int = 1) -> pd.Period:
-
     if period.month > month:
         period = pd.Period(year=period.year, month=month, freq="M")
     if period.month < month:
@@ -75,7 +77,6 @@ def floor_to_month(period: pd.Period, month: int = 1) -> pd.Period:
 
 
 def extract_leading_months(start: pd.Period, stop: pd.Period) -> list[dict[str, Any]]:
-
     time_ranges = []
     if start.month > 1 and (start.year < stop.year or stop.month == 12):
         stop = min(stop, pd.Period(year=start.year, month=12, freq="M"))
@@ -93,7 +94,6 @@ def extract_leading_months(start: pd.Period, stop: pd.Period) -> list[dict[str, 
 
 
 def extract_trailing_months(start: pd.Period, stop: pd.Period) -> list[dict[str, Any]]:
-
     time_ranges = []
     if not stop.month == 12:
         start = max(start, floor_to_month(stop, month=1))
@@ -111,7 +111,6 @@ def extract_trailing_months(start: pd.Period, stop: pd.Period) -> list[dict[str,
 
 
 def extract_years(start: pd.Period, stop: pd.Period) -> list[dict[str, Any]]:
-
     start = ceil_to_month(start, month=1)
     stop = floor_to_month(stop, month=12)
     years = list(range(start.year, stop.year + 1))
@@ -197,7 +196,6 @@ def update_request_date(
 
 
 def ensure_list(obj: Any) -> list[Any]:
-
     if isinstance(obj, (list, tuple)):
         return list(obj)
     else:
@@ -222,7 +220,6 @@ def build_chunks(
     values: list[Any] | Any,
     chunks_size: int,
 ) -> list[list[Any]] | list[Any]:
-
     values = ensure_list(values)
     values.copy()
     if chunks_size == 1:
@@ -284,29 +281,73 @@ def split_request(
     return requests
 
 
-def expand_dim_using_source(ds: xr.Dataset) -> xr.Dataset:
-    # TODO: workaround beacuse the toolbox is not able to open satellite datasets
-    if source := ds.encoding.get("source"):
-        ds = ds.expand_dims(source=[pathlib.Path(source).stem])
+def preprocess_satellite(ds: xr.Dataset) -> xr.Dataset:
+    # TODO: workaround because the toolbox is not able to open satellite datasets
+    if "time" not in ds.cf and "source" in ds.encoding:
+        ds = ds.expand_dims(source=[pathlib.Path(ds.encoding["source"]).stem])
     return ds
 
 
-@cacholote.cacheable
-def download_and_transform_chunk(
+def get_source(
     collection_id: str,
-    request: dict[str, Any],
-    transform_func: Callable[[xr.Dataset], xr.Dataset] | None = None,
+    request_list: list[dict[str, Any]],
+    exclude: list[str] = ["*.png", "*.json"],
+) -> list[str]:
+    source: set[str] = set()
+
+    for request in tqdm.tqdm(request_list) if len(request_list) > 1 else request_list:
+        data = cads_toolbox.catalogue.retrieve(collection_id, request).data
+        if content := getattr(data, "_content", None):
+            source.update(map(str, content))
+        else:
+            source.add(str(data.source))
+
+    for pattern in exclude:
+        source -= set(fnmatch.filter(source, pattern))
+    return list(source)
+
+
+def postprocess(
+    ds: xr.Dataset,
+    transform_func: Callable[..., xr.Dataset] | None,
+    **transform_func_kwargs: Any,
 ) -> xr.Dataset:
-    remote = cads_toolbox.catalogue.retrieve(collection_id, request)
-    kwargs = dict(TO_XARRAY_KWARGS)
-    if collection_id.startswith("satellite-"):
-        kwargs.setdefault("xarray_open_mfdataset_kwargs", {})
-        kwargs["xarray_open_mfdataset_kwargs"]["preprocess"] = expand_dim_using_source
-    ds: xr.Dataset = remote.to_xarray(**kwargs)
+    # TODO: workaround: cgul should make bounds coordinates
+    bounds = set(sum(ds.cf.bounds.values(), []))
+    ds = ds.set_coords(bounds)
     # TODO: make cacholote add coordinates? Needed to guarantee roundtrip
     # See: https://docs.xarray.dev/en/stable/user-guide/io.html#coordinates
     ds.attrs["coordinates"] = " ".join([str(coord) for coord in ds.coords])
-    return transform_func(ds) if transform_func else ds
+
+    return (
+        transform_func(ds, **transform_func_kwargs)
+        if transform_func is not None
+        else ds
+    )
+
+
+def get_data(source: list[str]) -> Any:
+    # TODO: emohawk not able to open a list of files
+    if len(source) == 1:
+        return emohawk.open(source[0])
+
+    emohwak_dir = emohawk.readers.directory.DirectoryReader("")
+    emohwak_dir._content = source
+    return emohwak_dir
+
+
+def _download_and_transform_requests(
+    collection_id: str,
+    request_list: list[dict[str, Any]],
+    transform_func: Callable[..., xr.Dataset] | None,
+    transform_func_kwargs: dict[str, Any],
+    **open_mfdataset_kwargs: Any,
+) -> xr.Dataset:
+    data = get_data(get_source(collection_id, request_list))
+    ds = data.to_xarray(
+        **TO_XARRAY_KWARGS, xarray_open_mfdataset_kwargs=open_mfdataset_kwargs
+    )
+    return postprocess(ds, transform_func, **transform_func_kwargs)
 
 
 def download_and_transform(
@@ -314,12 +355,18 @@ def download_and_transform(
     requests: list[dict[str, Any]] | dict[str, Any],
     chunks: dict[str, int] = {},
     split_all: bool = False,
-    transform_func: Callable[[xr.Dataset], xr.Dataset] | None = None,
+    transform_func: Callable[..., xr.Dataset] | None = None,
+    transform_func_kwargs: dict[str, Any] = {},
+    transform_chunks: bool = True,
     logger: logging.Logger | None = None,
-    **kwargs: Any,
+    **open_mfdataset_kwargs: Any,
 ) -> xr.Dataset:
     """
-    Download chunking along the selected parameters, apply the function f to each chunk and merge the results.
+    Download and transform data caching the results.
+
+    Datasets are chunked along the parameters specified by `chunks`.
+    If `transform_chunks` is True, the transform function is applied to each chunk.
+    Otherwise, the transform function is applied to the whole dataset after merging all chunks.
 
     Parameters
     ----------
@@ -333,8 +380,12 @@ def download_and_transform(
         Split all parameters. Mutually exclusive with chunks
     transform_func: callable, optional
         Function to apply to each single chunk
-    **kwargs:
-        kwargs to be passed on to xr.open_mfdataset
+    transform_func_kwargs: dict
+        Kwargs to be passed on to `transform_func`
+    transform_chunks: bool
+        Whether to transform and cache each chunk or the whole dataset
+    **open_mfdataset_kwargs:
+        Kwargs to be passed on to xr.open_mfdataset
 
     Returns
     -------
@@ -342,19 +393,53 @@ def download_and_transform(
     """
     logger = logger or LOGGER
 
+    # Handle satellite data
+    original_preprocess = open_mfdataset_kwargs.pop("preprocess", None)
+    if collection_id.startswith("satellite-"):
+
+        def preprocess(ds: xr.Dataset) -> xr.Dataset:
+            ds = preprocess_satellite(ds)
+            if original_preprocess is None:
+                return ds
+            ds = original_preprocess(preprocess_satellite(ds))
+            return ds
+
+    else:
+        preprocess = original_preprocess
+
+    # Cache results
+    download_and_transform_requests = _download_and_transform_requests
+    if transform_func is not None:
+        download_and_transform_requests = cacholote.cacheable(
+            download_and_transform_requests
+        )
+
+    # Split requests
     request_list = []
     for request in ensure_list(requests):
         request_list.extend(split_request(request, chunks, split_all))
 
-    datasets = []
-    for n, request_chunk in enumerate(request_list):
-        logger.info(f"Gathering file {n+1} out of {len(request_list)}...")
-        ds = download_and_transform_chunk(
+    if not transform_chunks or transform_func is None:
+        return download_and_transform_requests(
             collection_id,
-            request=request_chunk,
-            transform_func=transform_func,
+            request_list,
+            transform_func,
+            transform_func_kwargs,
+            preprocess=preprocess,
+            **open_mfdataset_kwargs,
         )
-        datasets.append(ds.encoding["source"])
 
-    logger.info("Aggregating data...")
-    return xr.open_mfdataset(datasets, **kwargs)
+    sources = []
+    for request in tqdm.tqdm(request_list):
+        ds = download_and_transform_requests(
+            collection_id,
+            [request],
+            transform_func,
+            transform_func_kwargs,
+            preprocess=preprocess,
+            **open_mfdataset_kwargs,
+        )
+        sources.append(ds.encoding["source"])
+    return xr.open_mfdataset(
+        sources, preprocess=original_preprocess, **open_mfdataset_kwargs
+    )

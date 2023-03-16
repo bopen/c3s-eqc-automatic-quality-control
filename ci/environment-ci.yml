@@ -14,5 +14,8 @@ dependencies:
 - sphinx-autoapi
 # DO NOT EDIT ABOVE THIS LINE, ADD DEPENDENCIES BELOW
 - pandas-stubs
+- pip
 - types-PyYAML
 - types-requests
+- pip:
+  - types-tqdm

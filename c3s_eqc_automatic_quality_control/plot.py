@@ -16,11 +16,18 @@ This module offers plot functions to visualise diagnostic results.
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Any
 
+import cartopy.crs as ccrs
+import matplotlib.pyplot as plt
 import plotly.colors as pc
 import plotly.express as px
 import plotly.graph_objs as go
 import xarray as xr
+from cartopy.mpl.geocollection import GeoQuadMesh
+from xarray.plot.facetgrid import FacetGrid
+
+from . import diagnostics
 
 VAR_NAMES_MAP = {
     "2m_temperature": "t2m",
@@ -55,7 +62,6 @@ def shaded_std(
     title: str | None = None,
     x_dim: str = "time",
 ) -> go.Figure:
-
     if isinstance(vars, str):
         vars = [vars]
     if hue_dim:
@@ -144,3 +150,62 @@ def shaded_std(
     )
 
     return fig
+
+
+levels = range(-30, 31, 5)
+colormap = "YlOrRd"
+
+
+def projected_map(
+    da: xr.DataArray, projection: ccrs.Projection = ccrs.Robinson(), **kwargs: Any
+) -> GeoQuadMesh | FacetGrid[Any]:
+    """Plot projected map.
+
+    Parameters
+    ----------
+    da: DataArray
+        DataArray to plot
+    projection: ccrs.Projection
+        Projection for the plot
+    **kwargs:
+        Keyword arguments for `da.plot`
+
+    Returns
+    -------
+    GeoQuadMesh or FacetGrid
+    """
+    # Set defaults
+    subplot_kws = kwargs.setdefault("subplot_kws", dict())
+    subplot_kws.setdefault("projection", projection)
+    kwargs.setdefault("transform", ccrs.PlateCarree())
+
+    # Plot
+    p = da.plot(**kwargs)
+
+    # Add coastlines and gridlines
+    if isinstance(p, FacetGrid):
+        for ax in p.axs.flat:
+            ax.coastlines()
+            ax.gridlines()
+    else:
+        p.axes.coastlines()
+        p.axes.gridlines(draw_labels=True)
+
+        # Compute statistics
+        dataarrays = [diagnostics.spatial_weighted_statistics(da)]
+        for stat in "min", "max":
+            dataarrays.append(getattr(da, stat)().expand_dims(diagnostic=[stat]))
+        da_stats = xr.merge(dataarrays)[da.name]
+
+        # Add statistics box
+        txt = "\n".join(
+            [
+                f"{k:>10}: {v.squeeze().values:f} {da.attrs.get('units', '')}"
+                for k, v in da_stats.groupby("diagnostic")
+            ]
+        )
+        plt.figtext(
+            1, 0.5, txt, ha="left", va="center", figure=p.figure, fontfamily="monospace"
+        )
+
+    return p

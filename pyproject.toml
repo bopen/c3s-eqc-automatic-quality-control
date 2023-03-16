@@ -31,7 +31,12 @@ strict = true
 ignore_missing_imports = true
 module = [
   "cads_toolbox",
-  "plotly.*"
+  "cartopy.*",
+  "cgul",
+  "emohawk.*",
+  "matplotlib.*",
+  "plotly.*",
+  "xesmf"
 ]
 
 [tool.ruff]
