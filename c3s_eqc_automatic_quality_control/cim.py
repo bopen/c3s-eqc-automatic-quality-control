@@ -33,7 +33,7 @@ API_USER = None
 API_PWD = None
 
 
-def http_request(url: str, request: str = "get", **kwargs: Any) -> requests.Response:
+def http_request(url: str, request: str = "get", **kwargs: Any) -> Any:
     method = getattr(requests, request)
     res = method(url, **kwargs)
     if res.status_code not in (200, 202):
