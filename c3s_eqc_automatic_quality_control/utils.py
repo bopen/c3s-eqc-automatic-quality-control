@@ -49,13 +49,28 @@ def regionalise(
     Cutout object
     """
     lon_name, lat_name = _get_lon_and_lat(obj, lon_name, lat_name)
-    if lon_slice.start is None and lon_slice.stop is None:
-        pass
-    elif lon_slice.start or lon_slice.stop < 0:
+    indexers = {lon_name: lon_slice, lat_name: lat_slice}
+
+    # Convert longitude
+    lon_limits = xr.DataArray([lon_slice.start, lon_slice.stop], dims=lon_name)
+    lon_limits = lon_limits.dropna(lon_name)
+    if (lon_limits < 0).any() and (obj[lon_name] >= 0).all():
         with xr.set_options(keep_attrs=True):  # type: ignore[no-untyped-call]
             obj[lon_name] = (obj[lon_name] + 180) % 360 - 180
-    else:
+        obj[lon_name] = obj[lon_name].sortby(lon_name)
+    elif (lon_limits > 180).any() and (obj[lon_name] <= 180).all():
         with xr.set_options(keep_attrs=True):  # type: ignore[no-untyped-call]
             obj[lon_name] = obj[lon_name] % 360
-    obj = obj.sortby([lon_name, lat_name])
-    return obj.sel({lon_name: lon_slice, lat_name: lat_slice})
+        obj[lon_name] = obj[lon_name].sortby(lon_name)
+
+    # Sort
+    for name, slice in indexers.items():
+        bounds = obj[name][[0, -1]]
+        ascending_bounds = bool(bounds.diff(name) > 0)
+        ascending_slice = bool(
+            xr.DataArray([slice.start, slice.stop], dims=name).fillna(bounds).diff(name)
+            > 0
+        )
+        if ascending_bounds is not ascending_slice:
+            obj = obj.sortby(name, ascending=ascending_slice)
+    return obj.sel(indexers)
