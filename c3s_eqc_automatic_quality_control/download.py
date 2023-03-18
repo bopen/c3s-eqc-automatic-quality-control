@@ -19,6 +19,7 @@ This module manages the execution of the quality control.
 
 import calendar
 import fnmatch
+import functools
 import itertools
 import logging
 import pathlib
@@ -28,6 +29,7 @@ from typing import Any
 import cacholote
 import cads_toolbox
 import cf_xarray  # noqa: F401
+import cgul
 import emohawk.readers.directory
 import pandas as pd
 import tqdm
@@ -42,7 +44,6 @@ LOGGER = dashboard.get_logger()
 
 # In the future, this kwargs should somehow be handle upstream by the toolbox.
 TO_XARRAY_KWARGS: dict[str, Any] = {
-    "harmonise": True,
     "pandas_read_csv_kwargs": {"comment": "#"},
 }
 
@@ -281,14 +282,7 @@ def split_request(
     return requests
 
 
-def preprocess_satellite(ds: xr.Dataset) -> xr.Dataset:
-    # TODO: workaround because the toolbox is not able to open satellite datasets
-    if "time" not in ds.cf and "source" in ds.encoding:
-        ds = ds.expand_dims(source=[pathlib.Path(ds.encoding["source"]).stem])
-    return ds
-
-
-def get_source(
+def get_sources(
     collection_id: str,
     request_list: list[dict[str, Any]],
     exclude: list[str] = ["*.png", "*.json"],
@@ -307,11 +301,31 @@ def get_source(
     return list(source)
 
 
-def postprocess(
+def preprocess_and_transform(
     ds: xr.Dataset,
-    transform_func: Callable[..., xr.Dataset] | None,
+    collection_id: str,
+    harmonise: bool = False,
+    preprocess: Callable[[xr.Dataset], xr.Dataset] | None = None,
+    transform_func: Callable[..., xr.Dataset] | None = None,
     **transform_func_kwargs: Any,
 ) -> xr.Dataset:
+    source = ds.encoding.get("source")
+
+    if preprocess is not None:
+        ds = preprocess(ds)
+
+    if harmonise:
+        ds = cgul.harmonise(ds)
+
+    # TODO: workaround: sometimes single timestamps are squeezed
+    if "time" not in ds.cf.dims:
+        if "forecast_reference_time" in ds.cf:
+            ds = ds.cf.expand_dims("forecast_reference_time")
+        elif "time" in ds:
+            ds = ds.expand_dims("time")
+        elif collection_id.startswith("satellite-") and source:
+            ds = ds.expand_dims(source=[pathlib.Path(source).stem])
+
     # TODO: workaround: cgul should make bounds coordinates
     bounds = set(sum(ds.cf.bounds.values(), []))
     ds = ds.set_coords(bounds)
@@ -319,18 +333,18 @@ def postprocess(
     # See: https://docs.xarray.dev/en/stable/user-guide/io.html#coordinates
     ds.attrs["coordinates"] = " ".join([str(coord) for coord in ds.coords])
 
-    return (
-        transform_func(ds, **transform_func_kwargs)
-        if transform_func is not None
-        else ds
-    )
+    if transform_func is not None:
+        ds = transform_func(ds, **transform_func_kwargs)
+    if source:
+        ds.encoding["source"] = source
+    return ds
 
 
 def get_data(source: list[str]) -> Any:
-    # TODO: emohawk not able to open a list of files
     if len(source) == 1:
         return emohawk.open(source[0])
 
+    # TODO: emohawk not able to open a list of files
     emohwak_dir = emohawk.readers.directory.DirectoryReader("")
     emohwak_dir._content = source
     return emohwak_dir
@@ -343,11 +357,43 @@ def _download_and_transform_requests(
     transform_func_kwargs: dict[str, Any],
     **open_mfdataset_kwargs: Any,
 ) -> xr.Dataset:
-    data = get_data(get_source(collection_id, request_list))
-    ds = data.to_xarray(
-        **TO_XARRAY_KWARGS, xarray_open_mfdataset_kwargs=open_mfdataset_kwargs
+    # TODO: Ideally, we would always use emohawk.
+    # However, there is not a consistent behavior across backends.
+    # For example, GRIB silently ignore open_mfdataset_kwargs
+    sources = get_sources(collection_id, request_list)
+    try:
+        engine = open_mfdataset_kwargs.get(
+            "engine", {xr.backends.plugins.guess_engine(s) for s in sources}
+        )
+        use_emohawk = len(engine) != 1
+    except ValueError:
+        use_emohawk = True
+
+    if use_emohawk:
+        data = get_data(sources)
+        ds = data.to_xarray(
+            harmonise=True,
+            xarray_open_mfdataset_kwargs=open_mfdataset_kwargs,
+            **TO_XARRAY_KWARGS,
+        )
+        return preprocess_and_transform(
+            ds,
+            collection_id=collection_id,
+            preprocess=None,  # Already in xarray_open_mfdataset_kwargs
+            harmonise=False,  # Already in to_xarray
+            transform_func=transform_func,
+            **transform_func_kwargs,
+        )
+
+    open_mfdataset_kwargs["preprocess"] = functools.partial(
+        preprocess_and_transform,
+        collection_id=collection_id,
+        preprocess=open_mfdataset_kwargs.get("preprocess", None),
+        harmonise=True,
+        transform_func=transform_func,
+        **transform_func_kwargs,
     )
-    return postprocess(ds, transform_func, **transform_func_kwargs)
+    return xr.open_mfdataset(sources, **open_mfdataset_kwargs)
 
 
 def download_and_transform(
@@ -393,20 +439,6 @@ def download_and_transform(
     """
     logger = logger or LOGGER
 
-    # Handle satellite data
-    original_preprocess = open_mfdataset_kwargs.pop("preprocess", None)
-    if collection_id.startswith("satellite-"):
-
-        def preprocess(ds: xr.Dataset) -> xr.Dataset:
-            ds = preprocess_satellite(ds)
-            if original_preprocess is None:
-                return ds
-            ds = original_preprocess(preprocess_satellite(ds))
-            return ds
-
-    else:
-        preprocess = original_preprocess
-
     # Cache results
     download_and_transform_requests = _download_and_transform_requests
     if transform_func is not None:
@@ -420,26 +452,28 @@ def download_and_transform(
         request_list.extend(split_request(request, chunks, split_all))
 
     if not transform_chunks or transform_func is None:
-        return download_and_transform_requests(
+        ds = download_and_transform_requests(
             collection_id,
             request_list,
             transform_func,
             transform_func_kwargs,
-            preprocess=preprocess,
             **open_mfdataset_kwargs,
         )
+    else:
+        # Cache each chunk separately
+        preprocess = open_mfdataset_kwargs.pop("preprocess", None)
+        sources = []
+        for request in tqdm.tqdm(request_list):
+            ds = download_and_transform_requests(
+                collection_id,
+                [request],
+                transform_func,
+                transform_func_kwargs,
+                preprocess=preprocess,
+                **open_mfdataset_kwargs,
+            )
+            sources.append(ds.encoding["source"])
+        ds = xr.open_mfdataset(sources, **open_mfdataset_kwargs)
 
-    sources = []
-    for request in tqdm.tqdm(request_list):
-        ds = download_and_transform_requests(
-            collection_id,
-            [request],
-            transform_func,
-            transform_func_kwargs,
-            preprocess=preprocess,
-            **open_mfdataset_kwargs,
-        )
-        sources.append(ds.encoding["source"])
-    return xr.open_mfdataset(
-        sources, preprocess=original_preprocess, **open_mfdataset_kwargs
-    )
+    ds.attrs.pop("coordinates", None)
+    return ds
