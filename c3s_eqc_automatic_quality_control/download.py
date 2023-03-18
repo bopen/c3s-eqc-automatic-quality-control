@@ -425,11 +425,11 @@ def download_and_transform(
     -------
     xr.Dataset
     """
-    logger = logger or LOGGER
+    logger = logger or LOGGER  # TODO: just for backward compatibility with runner
 
-    # Cache results
     download_and_transform_requests = _download_and_transform_requests
     if transform_func is not None:
+        # Cache results
         download_and_transform_requests = cacholote.cacheable(
             download_and_transform_requests
         )
@@ -449,7 +449,6 @@ def download_and_transform(
         )
     else:
         # Cache each chunk separately
-        preprocess = open_mfdataset_kwargs.pop("preprocess", None)
         sources = []
         for request in tqdm.tqdm(request_list):
             ds = download_and_transform_requests(
@@ -457,10 +456,10 @@ def download_and_transform(
                 [request],
                 transform_func,
                 transform_func_kwargs,
-                preprocess=preprocess,
                 **open_mfdataset_kwargs,
             )
             sources.append(ds.encoding["source"])
+        open_mfdataset_kwargs.pop("preprocess", None)  # Already preprocessed and cached
         ds = xr.open_mfdataset(sources, **open_mfdataset_kwargs)
 
     ds.attrs.pop("coordinates", None)
