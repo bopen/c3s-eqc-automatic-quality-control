@@ -301,21 +301,17 @@ def get_sources(
     return list(source)
 
 
-def preprocess_and_transform(
+def _preprocess(
     ds: xr.Dataset,
     collection_id: str,
-    harmonise: bool = False,
     preprocess: Callable[[xr.Dataset], xr.Dataset] | None = None,
-    transform_func: Callable[..., xr.Dataset] | None = None,
-    **transform_func_kwargs: Any,
 ) -> xr.Dataset:
     source = ds.encoding.get("source")
 
     if preprocess is not None:
         ds = preprocess(ds)
 
-    if harmonise:
-        ds = cgul.harmonise(ds)
+    ds = cgul.harmonise(ds)
 
     # TODO: workaround: sometimes single timestamps are squeezed
     if "time" not in ds.cf.dims:
@@ -329,12 +325,7 @@ def preprocess_and_transform(
     # TODO: workaround: cgul should make bounds coordinates
     bounds = set(sum(ds.cf.bounds.values(), []))
     ds = ds.set_coords(bounds)
-    # TODO: make cacholote add coordinates? Needed to guarantee roundtrip
-    # See: https://docs.xarray.dev/en/stable/user-guide/io.html#coordinates
-    ds.attrs["coordinates"] = " ".join([str(coord) for coord in ds.coords])
 
-    if transform_func is not None:
-        ds = transform_func(ds, **transform_func_kwargs)
     if source:
         ds.encoding["source"] = source
     return ds
@@ -369,31 +360,28 @@ def _download_and_transform_requests(
     except ValueError:
         use_emohawk = True
 
+    open_mfdataset_kwargs["preprocess"] = functools.partial(
+        _preprocess,
+        collection_id=collection_id,
+        preprocess=open_mfdataset_kwargs.get("preprocess", None),
+    )
+
     if use_emohawk:
         data = get_data(sources)
-        ds = data.to_xarray(
-            harmonise=True,
+        ds: xr.Dataset = data.to_xarray(
             xarray_open_mfdataset_kwargs=open_mfdataset_kwargs,
             **TO_XARRAY_KWARGS,
         )
-        return preprocess_and_transform(
-            ds,
-            collection_id=collection_id,
-            preprocess=None,  # Already in xarray_open_mfdataset_kwargs
-            harmonise=False,  # Already in to_xarray
-            transform_func=transform_func,
-            **transform_func_kwargs,
-        )
+    else:
+        ds = xr.open_mfdataset(sources, **open_mfdataset_kwargs)
 
-    open_mfdataset_kwargs["preprocess"] = functools.partial(
-        preprocess_and_transform,
-        collection_id=collection_id,
-        preprocess=open_mfdataset_kwargs.get("preprocess", None),
-        harmonise=True,
-        transform_func=transform_func,
-        **transform_func_kwargs,
-    )
-    return xr.open_mfdataset(sources, **open_mfdataset_kwargs)
+    if transform_func is not None:
+        ds = transform_func(ds, **transform_func_kwargs)
+
+    # TODO: make cacholote add coordinates? Needed to guarantee roundtrip
+    # See: https://docs.xarray.dev/en/stable/user-guide/io.html#coordinates
+    ds.attrs["coordinates"] = " ".join([str(coord) for coord in ds.coords])
+    return ds
 
 
 def download_and_transform(
