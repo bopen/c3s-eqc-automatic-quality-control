@@ -354,7 +354,7 @@ def _download_and_transform_requests(
     sources = get_sources(collection_id, request_list)
     try:
         engine = open_mfdataset_kwargs.get(
-            "engine", {xr.backends.plugins.guess_engine(s) for s in sources}
+            "engine", {xr.backends.plugins.guess_engine(source) for source in sources}
         )
         use_emohawk = len(engine) != 1
     except ValueError:
