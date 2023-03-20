@@ -16,15 +16,19 @@ This module offers plot functions to visualise diagnostic results.
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Any
+from typing import Any, Iterable
 
 import cartopy.crs as ccrs
+import matplotlib.colors
+import matplotlib.patches
 import matplotlib.pyplot as plt
+import numpy as np
 import plotly.colors as pc
 import plotly.express as px
 import plotly.graph_objs as go
 import xarray as xr
 from cartopy.mpl.geocollection import GeoQuadMesh
+from matplotlib.image import AxesImage
 from xarray.plot.facetgrid import FacetGrid
 
 from . import diagnostics
@@ -33,6 +37,9 @@ VAR_NAMES_MAP = {
     "2m_temperature": "t2m",
     "skin_temperature": "skt",
 }
+
+FLAGS_T = int | Iterable[int]
+COLOR_T = str | Iterable[str]
 
 
 def line_plot(
@@ -209,3 +216,76 @@ def projected_map(
         )
 
     return p
+
+
+def _infer_legend_dict(da: xr.DataArray) -> dict[str, tuple[COLOR_T, FLAGS_T]]:
+    flags = list(map(int, da.attrs["flag_values"]))
+    colors = da.attrs["flag_colors"].split()
+    meanings = da.attrs["flag_meanings"].split()
+
+    assert len(flags) == len(meanings)
+    if len(flags) - len(colors) == 1:
+        colors.insert(flags.index(0), "#000000")
+
+    legend_dict: dict[str, tuple[COLOR_T, FLAGS_T]] = {}
+    for m, c, f in zip(meanings, colors, flags, strict=True):
+        legend_dict[m.replace("_", " ").title()] = (c, f)
+    return legend_dict
+
+
+def lccs_map(
+    da: xr.DataArray,
+    legend_dict: dict[str, tuple[COLOR_T, FLAGS_T]] | None = None,
+    **kwargs: Any,
+) -> AxesImage | FacetGrid[Any]:
+    """
+    Plot LCCS map.
+
+    Parameters
+    ----------
+    da: xr.DataArray
+        DataArray to plot
+    legend_dict: dict, optional
+        Dictional mapping {meaning: (color, flags)}
+    **kwargs:
+        Keyword arguments for `da.plot.imshow`
+
+    Returns
+    -------
+    AxesImage or FacetGrid
+    """
+    if legend_dict is None:
+        legend_dict = _infer_legend_dict(da)
+
+    # Build vars for plotting
+    handles = []
+    labels = list(legend_dict)
+    color_dict = {}
+    for color, flags in legend_dict.values():
+        color = matplotlib.colors.to_rgba(color)
+        handles.append(matplotlib.patches.Rectangle((0, 0), 1, 1, color=color))
+        for flag in [flags] if isinstance(flags, int) else flags:
+            assert flag not in color_dict
+            color_dict[flag] = color
+
+    # Convert to rgb
+    rgb = xr.concat(
+        [
+            xr.DataArray(v, coords=da.coords, dims=da.dims)
+            for v in np.vectorize(color_dict.get)(da)
+        ],
+        "rgb",
+    )
+    plot_obj = rgb.plot.imshow(rgb="rgb", **kwargs)
+
+    # Add legend
+    fig = getattr(plot_obj, "fig" if isinstance(plot_obj, FacetGrid) else "figure")
+    fig.legend(handles, labels, bbox_to_anchor=(1, 1), loc="upper left")
+
+    # Add grid
+    if isinstance(plot_obj, FacetGrid):
+        for ax in plot_obj.axs.flat:
+            ax.grid()
+    else:
+        plot_obj.axes.grid()
+    return plot_obj
