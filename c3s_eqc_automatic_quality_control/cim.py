@@ -29,6 +29,7 @@ import requests
 API_USER_VAR_NAME = "EQC_AQC_API_USER"
 API_PWD_VAR_NAME = "EQC_AQC_API_PWD"
 CIM = "https://cds2-backoffice-dev.copernicus-climate.eu/api/v1/"
+RENDERED = "https://github.com/bopen/c3s-eqc-toolbox-template.git"
 API_USER = None
 API_PWD = None
 
@@ -66,6 +67,8 @@ def push_notebooks(
 ) -> None:
     if isinstance(notebook_paths, str):
         notebook_paths = [notebook_paths]
+    if repo_url is None:
+        repo_url = RENDERED
 
     with tempfile.TemporaryDirectory() as tempdir:
         # Clone the repository

@@ -23,7 +23,6 @@ import typer
 
 from . import cim, dashboard, runner
 
-REPO_URL = "https://github.com/bopen/c3s-eqc-toolbox-template.git"
 STATUSES = {
     "DONE": "[green]DONE[/]",
     "FAILED": "[red]FAILED[/]",
@@ -99,7 +98,7 @@ def list_task(
 @app.command(name="push-notebook")
 def push(
     notebook_paths: str,
-    repo_url: str = typer.Option(REPO_URL, "--repo", "-r"),
+    repo_url: str = typer.Option(None, "--repo", "-r"),
     branch: str = typer.Option("notebooks", "--branch", "-b"),
     user_dir: str = typer.Option("user", "--user", "-u"),
 ) -> None:
@@ -115,7 +114,7 @@ def push(
 @app.command(name="push-qar")
 def push_qar(
     workdir: str,
-    repo_url: str = typer.Option(REPO_URL, "--repo", "-r"),
+    repo_url: str = typer.Option(None, "--repo", "-r"),
     branch: str = typer.Option("notebooks", "--branch", "-b"),
     user_dir: str = typer.Option("user", "--user", "-u"),
 ) -> None:
