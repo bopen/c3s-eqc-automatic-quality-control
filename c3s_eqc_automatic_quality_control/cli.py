@@ -17,6 +17,7 @@ This module manages the command line interfaces.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os.path
 
 import rich
 import typer
@@ -33,6 +34,12 @@ app = typer.Typer(
     no_args_is_help=True,
     help="C3S EQC Automatic Quality Control CLI",
 )
+
+
+def _test_workdir(workdir):
+    if not os.path.exists(workdir):
+        return f"[red]{workdir}[/]"
+    return workdir
 
 
 def eqc() -> None:
@@ -77,7 +84,7 @@ def run_dashboard(
             STATUSES[info["status"]],
             info["start"],
             info["stop"],
-            info["workdir"],
+            _test_workdir(info["workdir"]),
         )
     rich.print(table)
 
