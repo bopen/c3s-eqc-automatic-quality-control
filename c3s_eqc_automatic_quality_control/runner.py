@@ -23,8 +23,8 @@ import uuid
 # limitations under the License.
 from inspect import getmembers, isfunction
 
+import nbclient
 import nbformat
-from nbclient import NotebookClient
 
 from . import dashboard, diagnostics
 
@@ -75,10 +75,12 @@ def run(
     # Move into qar subfolder
     os.chdir(run_sub)
     try:
-        nb = nbformat.read(notebook_resolved, as_version=4)
-        client = NotebookClient(nb)
+        nb = nbformat.read(
+            notebook_resolved, as_version=4
+        )  # type: ignore[no-untyped-call]
+        client = nbclient.NotebookClient(nb)  # type: ignore[attr-defined]
         client.execute()
-        nbformat.write(nb, executed_notebook)
+        nbformat.write(nb, executed_notebook)  # type: ignore[no-untyped-call]
         logger.info(f"Rendered notebook: {run_sub}/{executed_notebook}")
     except:  # noqa: E722
         logger.exception(f"{msg} - FAILED")

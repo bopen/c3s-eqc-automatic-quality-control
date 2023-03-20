@@ -72,7 +72,7 @@ def push_notebooks(
 
     with tempfile.TemporaryDirectory() as tempdir:
         # Clone the repository
-        repo = git.Repo.clone_from(repo_url, tempdir, branch=branch)
+        repo = git.Repo.clone_from(repo_url, tempdir, branch=branch)  # type: ignore[attr-defined]
 
         dest_dir = f"{tempdir}/rendered_notebooks/{user_dir}"
         try:
