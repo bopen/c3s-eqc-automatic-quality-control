@@ -18,12 +18,6 @@ conda-env-update:
 	$(CONDA) env update $(CONDAFLAGS) -f ci/environment-ci.yml
 	$(CONDA) env update $(CONDAFLAGS) -f environment.yml
 
-docker-build:
-	docker build -t $(PROJECT) .
-
-docker-run:
-	docker run --rm -ti -v $(PWD):/srv $(PROJECT)
-
 template-update:
 	pre-commit run --all-files cruft -c .pre-commit-config-cruft.yaml
 
