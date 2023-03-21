@@ -114,7 +114,7 @@ def shaded_std(
             if hue_dim:
                 label = str(da_mean[hue_dim].values)
             else:
-                label = da_mean.attrs.get("long_name", var)
+                label = xr.plot.utils.label_from_attrs(da_mean)
 
             data.append(
                 go.Scatter(
@@ -360,25 +360,21 @@ def lccs_bar(
         pd_dict[meaning] = da_reduced
         colors.append(matplotlib.colors.to_hex(color))
 
+    df_or_ser: pd.DataFrame | pd.Series[Any] = (
+        pd.DataFrame(pd_dict, index=da_reduced[da_reduced.dims[0]])
+        if groupby_bins_dims
+        else pd.Series(pd_dict)
+    )
+
+    # Set default kwargs
     if groupby_bins_dims:
-        index_name, *_ = da_reduced.dims
-        df_or_ser: pd.DataFrame | pd.Series[Any] = pd.DataFrame(
-            pd_dict, index=da_reduced[index_name]
-        )
-
-        # Defaults
         kwargs.setdefault("stacked", True)
-        xlabel = da[groupby_dim].attrs.get("long_name", da[groupby_dim].name or "")
-        if units := da[groupby_dim].attrs.get("units"):
-            xlabel += f" [{units}]"
+        kwargs.setdefault("xlabel", xr.plot.utils.label_from_attrs(da[groupby_dim]))
     else:
-        df_or_ser = pd.Series(pd_dict)
-
-        # Defaults
-        xlabel = da_lccs.attrs.get("long_name", da_lccs.name or "")
-    kwargs.setdefault("xlabel", xlabel)
+        kwargs.setdefault("xlabel", xr.plot.utils.label_from_attrs(da_lccs))
     kwargs.setdefault(
-        "ylabel", f"{reduction.title()} of {da.attrs.get('long_name', da.name)}"
+        "ylabel",
+        " ".join([reduction.title(), "of", xr.plot.utils.label_from_attrs(da)]),
     )
 
     ax = df_or_ser.plot.bar(color=colors, **kwargs)
