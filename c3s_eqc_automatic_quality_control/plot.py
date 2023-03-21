@@ -177,7 +177,7 @@ def projected_map(
     projection: ccrs.Projection
         Projection for the plot
     **kwargs:
-        Keyword arguments for `da.plot`
+        Keyword arguments for `xr.plot`
 
     Returns
     -------
@@ -225,7 +225,9 @@ def _infer_legend_dict(da: xr.DataArray) -> dict[str, tuple[COLOR_T, FLAGS_T]]:
     colors = da.attrs["flag_colors"].split()
     meanings = da.attrs["flag_meanings"].split()
 
-    assert len(flags) == len(meanings)
+    assert (
+        len(flags) == len(meanings) and 0 <= len(flags) - len(colors) <= 1
+    ), "flags/meanings/colors missmatch"
     if len(flags) - len(colors) == 1:
         colors.insert(flags.index(0), "#000000")
 
@@ -267,7 +269,7 @@ def lccs_map(
         color = matplotlib.colors.to_rgba(color)
         handles.append(matplotlib.patches.Rectangle((0, 0), 1, 1, color=color))
         for flag in [flags] if isinstance(flags, int) else flags:
-            assert flag not in color_dict
+            assert flag not in color_dict, f"flag {flag} is repeated"
             color_dict[flag] = color
 
     # Convert to rgb
@@ -316,11 +318,11 @@ def lccs_bar(
     reduction: str
         Reduction to apply
     groupby_bins_dims: dict
-        Dictionary mapping dimension and bins for groupby_bin_dims
+        Dictionary mapping dimension name to bins for groupby_bin_dims
     exclude_no_data: bool
-        Whether to exclude No Data flag or not
+        Whether to exclude the "No Data" flag or not
     **kwargs:
-        Keyword arguments for `series.plot.bar`
+        Keyword arguments for `pd.plot.bar`
 
     Returns
     -------
@@ -333,7 +335,9 @@ def lccs_bar(
         da_lccs = da_lccs.where(da_lccs != 0)
 
     if groupby_bins_dims:
-        assert len(groupby_bins_dims) == 1
+        assert (
+            len(groupby_bins_dims) == 1
+        ), "groupby_bins_dims must have a dimension only"
         groupby_dim, *_ = groupby_bins_dims.keys()
         groupby_bins, *_ = groupby_bins_dims.values()
 
