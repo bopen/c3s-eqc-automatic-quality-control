@@ -344,7 +344,7 @@ def lccs_bar(
     colors = []
     pd_dict = {}
     for meaning, (color, flags) in labels_dict.items():
-        if exclude_no_data and flags in (0, [0]):
+        if exclude_no_data and flags in (0, [0], (0,), {0}):
             continue
 
         masked = da.where(da_lccs.isin([flags] if isinstance(flags, int) else flags))
