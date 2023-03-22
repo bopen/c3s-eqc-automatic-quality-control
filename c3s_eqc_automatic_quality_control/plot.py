@@ -33,7 +33,7 @@ from matplotlib.axes import Axes
 from matplotlib.image import AxesImage
 from xarray.plot.facetgrid import FacetGrid
 
-from . import diagnostics
+from . import diagnostics, utils
 
 VAR_NAMES_MAP = {
     "2m_temperature": "t2m",
@@ -384,3 +384,36 @@ def lccs_bar(
     if groupby_bins_dims:
         ax.legend(bbox_to_anchor=(1, 1), loc="upper left")
     return ax
+
+
+def seasonal_boxplot(
+    da: xr.DataArray, time_dim: str | None = None, **kwargs: Any
+) -> "pd.Series[Axes]":
+    """
+    Plot a seasonal boxplot.
+
+    Parameters
+    ----------
+    da: xr.DataArray
+        DataArray to plot
+    time: str, optional
+        Name of time dimension
+    **kwargs: Any
+        Keyword arguments for pd.DataFrameGroupBy.boxplot
+
+    Returns
+    -------
+    Series[Axes]
+    """
+    kwargs.setdefault("ylabel", xr.plot.utils.label_from_attrs(da))
+    time_dim = utils._get_time(da, time_dim)
+
+    da = da.stack(stacked_dim=da.dims)
+    df = da.to_dataframe()
+    axes: pd.Series[Axes] = df.groupby(by=da[time_dim].dt.season.values).boxplot(
+        layout=(1, 4), **kwargs
+    )
+    for ax in axes:
+        ax.xaxis.set_ticklabels([])
+
+    return axes

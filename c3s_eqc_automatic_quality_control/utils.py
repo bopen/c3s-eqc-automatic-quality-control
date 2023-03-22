@@ -16,6 +16,12 @@
 import xarray as xr
 
 
+def _get_time(obj: xr.Dataset | xr.DataArray, time: str | None) -> str:
+    if time is None:
+        (time,) = obj.cf.coordinates["time"]
+    return time
+
+
 def _get_lon_and_lat(
     obj: xr.Dataset | xr.DataArray, lon: str | None, lat: str | None
 ) -> tuple[str, str]:

@@ -372,11 +372,18 @@ def _download_and_transform_requests(
             xarray_open_mfdataset_kwargs=open_mfdataset_kwargs,
             **TO_XARRAY_KWARGS,
         )
+        if not isinstance(ds, xr.Dataset):
+            # When emohawk fails to concat, it silently return a list
+            raise TypeError(f"`emohawk` returned {type(ds)} instead of a xr.Dataset")
     else:
         ds = xr.open_mfdataset(sources, **open_mfdataset_kwargs)
 
     if transform_func is not None:
         ds = transform_func(ds, **transform_func_kwargs)
+        if not isinstance(ds, xr.Dataset):
+            raise TypeError(
+                f"`transform_func` must return a xr.Dataset, while it returned {type(ds)}"
+            )
 
     # TODO: make cacholote add coordinates? Needed to guarantee roundtrip
     # See: https://docs.xarray.dev/en/stable/user-guide/io.html#coordinates

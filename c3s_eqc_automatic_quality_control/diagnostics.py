@@ -27,12 +27,6 @@ import xesmf as xe
 from . import utils
 
 
-def _get_time(obj: xr.Dataset | xr.DataArray, time: str | None) -> str:
-    if time is None:
-        (time,) = obj.cf.coordinates["time"]
-    return time
-
-
 def _spatial_weights(
     obj: xr.Dataset | xr.DataArray, lon: str | None = None, lat: str | None = None
 ) -> xr.DataArray:
@@ -92,7 +86,7 @@ def seasonal_weighted_mean(obj: xr.Dataset, time: str | None = None) -> xr.Datas
     -------
     reduced object
     """
-    time = _get_time(obj, time)
+    time = utils._get_time(obj, time)
 
     with xr.set_options(keep_attrs=True):  # type: ignore[no-untyped-call]
         obj = obj.convert_calendar("noleap", align_on="date")
@@ -120,7 +114,7 @@ def annual_weighted_mean(obj: xr.Dataset, time: str | None = None) -> xr.Dataset
     -------
     reduced object
     """
-    time = _get_time(obj, time)
+    time = utils._get_time(obj, time)
 
     season_obj = seasonal_weighted_mean(obj, time)
     with xr.set_options(keep_attrs=True):  # type: ignore[no-untyped-call]
