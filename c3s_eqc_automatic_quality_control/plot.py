@@ -198,7 +198,9 @@ def projected_map(
             ax.gridlines()
     else:
         p.axes.coastlines()
-        p.axes.gridlines(draw_labels=True)
+        gl = p.axes.gridlines(draw_labels=True)
+        gl.top_labels = False
+        gl.right_labels = False
 
         # Compute statistics
         dataarrays = [diagnostics.spatial_weighted_statistics(da)]
@@ -207,9 +209,10 @@ def projected_map(
         da_stats = xr.merge(dataarrays)[da.name]
 
         # Add statistics box
+        units = f" [{units}]" if (units := da.attrs.get("units")) else ""
         txt = "\n".join(
             [
-                f"{k:>10}: {v.squeeze().values:f} {da.attrs.get('units', '')}"
+                f"{k:>10}: {v.squeeze().values:f}{units}"
                 for k, v in da_stats.groupby("diagnostic")
             ]
         )
