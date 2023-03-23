@@ -16,6 +16,7 @@ This module offers plot functions to visualise diagnostic results.
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import warnings
 from typing import Any, Iterable
 
 import cartopy.crs as ccrs
@@ -166,7 +167,10 @@ colormap = "YlOrRd"
 
 
 def projected_map(
-    da: xr.DataArray, projection: ccrs.Projection = ccrs.Robinson(), **kwargs: Any
+    da: xr.DataArray,
+    projection: ccrs.Projection = ccrs.Robinson(),
+    show_stats: bool | None = None,
+    **kwargs: Any,
 ) -> GeoQuadMesh | FacetGrid[Any]:
     """Plot projected map.
 
@@ -196,6 +200,11 @@ def projected_map(
         for ax in p.axs.flat:
             ax.coastlines()
             ax.gridlines()
+
+        if show_stats:
+            warnings.warn(
+                "`show_stats` must be False for FacetGrid plots.", UserWarning
+            )
     else:
         p.axes.coastlines()
         gl = p.axes.gridlines(draw_labels=True)
@@ -203,22 +212,29 @@ def projected_map(
         gl.right_labels = False
 
         # Compute statistics
-        dataarrays = [diagnostics.spatial_weighted_statistics(da)]
-        for stat in "min", "max":
-            dataarrays.append(getattr(da, stat)().expand_dims(diagnostic=[stat]))
-        da_stats = xr.merge(dataarrays)[da.name]
+        if (show_stats is None) or show_stats:
+            dataarrays = [diagnostics.spatial_weighted_statistics(da)]
+            for stat in "min", "max":
+                dataarrays.append(getattr(da, stat)().expand_dims(diagnostic=[stat]))
+            da_stats = xr.merge(dataarrays)[da.name]
 
-        # Add statistics box
-        units = f" [{units}]" if (units := da.attrs.get("units")) else ""
-        txt = "\n".join(
-            [
-                f"{k:>10}: {v.squeeze().values:f}{units}"
-                for k, v in da_stats.groupby("diagnostic")
-            ]
-        )
-        plt.figtext(
-            1, 0.5, txt, ha="left", va="center", figure=p.figure, fontfamily="monospace"
-        )
+            # Add statistics box
+            units = f" [{units}]" if (units := da.attrs.get("units")) else ""
+            txt = "\n".join(
+                [
+                    f"{k:>10}: {v.squeeze().values:f}{units}"
+                    for k, v in da_stats.groupby("diagnostic")
+                ]
+            )
+            plt.figtext(
+                1,
+                0.5,
+                txt,
+                ha="left",
+                va="center",
+                figure=p.figure,
+                fontfamily="monospace",
+            )
 
     return p
 
@@ -406,12 +422,13 @@ def seasonal_boxplot(
     Series[Axes]
     """
     kwargs.setdefault("ylabel", xr.plot.utils.label_from_attrs(da))
+    kwargs.setdefault("layout", (1, 4))
     time_dim = utils._get_time(da, time_dim)
 
     da = da.stack(stacked_dim=da.dims)
     df = da.to_dataframe()
     axes: pd.Series[Axes] = df.groupby(by=da[time_dim].dt.season.values).boxplot(
-        layout=(1, 4), **kwargs
+        **kwargs
     )
     for ax in axes:
         ax.xaxis.set_ticklabels([])
