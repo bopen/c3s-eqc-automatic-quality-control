@@ -327,7 +327,7 @@ def _preprocess(
 
     # TODO: workaround: sometimes single timestamps are squeezed
     time_dims = set(ds.cf.coordinates.get("time", [])) & set(ds.dims)
-    if "time" not in time_dims:
+    if not time_dims:
         if "forecast_reference_time" in ds.cf:
             ds = ds.cf.expand_dims("forecast_reference_time")
         elif "time" in ds:
