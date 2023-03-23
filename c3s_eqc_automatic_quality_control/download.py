@@ -258,28 +258,40 @@ def split_request(
     if split_all:
         chunks = {k: 1 for k, v in request.items() if isinstance(v, (tuple, list, set))}
 
-    if not chunks:
-        return [request]
-
     requests = []
-    list_values = list(
-        itertools.product(
-            *[
-                build_chunks(request[par], chunk_size)
-                for par, chunk_size in chunks.items()
-            ]
+    if not chunks:
+        requests.append(request)
+    else:
+        list_values = list(
+            itertools.product(
+                *[
+                    build_chunks(request[par], chunk_size)
+                    for par, chunk_size in chunks.items()
+                ]
+            )
         )
-    )
-    for values in list_values:
-        out_request = request.copy()
-        for parameter, value in zip(chunks, values):
-            out_request[parameter] = value
+        for values in list_values:
+            out_request = request.copy()
+            for parameter, value in zip(chunks, values):
+                out_request[parameter] = value
 
-        if not check_non_empty_date(out_request):
-            continue
+            if not check_non_empty_date(out_request):
+                continue
 
-        requests.append(out_request)
-    return requests
+            requests.append(out_request)
+    return [ensure_request_gets_cached(request) for request in requests]
+
+
+def ensure_request_gets_cached(request: dict[str, Any]) -> dict[str, Any]:
+    cacheable_request = {}
+    for k, v in sorted(request.items()):
+        if not isinstance(v, str):
+            try:
+                v = v[0] if len(v) == 1 else list(v)
+            except TypeError:
+                pass
+        cacheable_request[k] = v
+    return cacheable_request
 
 
 def get_sources(

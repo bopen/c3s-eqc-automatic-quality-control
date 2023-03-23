@@ -89,7 +89,7 @@ def seasonal_weighted_mean(obj: xr.Dataset, time: str | None = None) -> xr.Datas
     time = utils._get_time(obj, time)
 
     with xr.set_options(keep_attrs=True):  # type: ignore[no-untyped-call]
-        obj = obj.convert_calendar("noleap", align_on="date")
+        obj = obj.convert_calendar("noleap", align_on="date", dim=time)
         month_length = obj[time].dt.days_in_month
         weights = (
             month_length.groupby(f"{time}.season")
@@ -118,7 +118,7 @@ def annual_weighted_mean(obj: xr.Dataset, time: str | None = None) -> xr.Dataset
 
     season_obj = seasonal_weighted_mean(obj, time)
     with xr.set_options(keep_attrs=True):  # type: ignore[no-untyped-call]
-        obj = obj.convert_calendar("noleap", align_on="date")
+        obj = obj.convert_calendar("noleap", align_on="date", dim=time)
         month_length = obj[time].dt.days_in_month
         weights = month_length.groupby(f"{time}.season").sum() / (
             month_length.groupby(f"{time}.season").sum().sum()

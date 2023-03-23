@@ -267,3 +267,9 @@ def test_stringify_dates(
     )
     assert request["month"] == expected_month
     assert request["day"] == expected_day
+
+
+def test_ensure_request_gets_cached() -> None:
+    request = {"f": [2, 1], "e": [1], "d": 1, "c": ["b", "a"], "b": ["ba"], "a": "ba"}
+    expected = {"a": "ba", "b": "ba", "c": ["b", "a"], "d": 1, "e": 1, "f": [2, 1]}
+    assert download.ensure_request_gets_cached(request) == expected
