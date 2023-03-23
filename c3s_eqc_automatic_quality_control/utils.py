@@ -17,9 +17,13 @@ import xarray as xr
 
 
 def _get_time(obj: xr.Dataset | xr.DataArray, time: str | None) -> str:
-    if time is None:
-        (time,) = obj.cf.coordinates["time"]
-    return time
+    if time:
+        return time
+
+    times: set[str] = set(obj.cf.coordinates.get("time", [])) & set(obj.dims)
+    if len(times) == 1:
+        return list(times)[0]
+    raise ValueError("Can NOT auto infer time dimension.")
 
 
 def _get_lon_and_lat(

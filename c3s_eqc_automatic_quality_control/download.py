@@ -258,28 +258,40 @@ def split_request(
     if split_all:
         chunks = {k: 1 for k, v in request.items() if isinstance(v, (tuple, list, set))}
 
-    if not chunks:
-        return [request]
-
     requests = []
-    list_values = list(
-        itertools.product(
-            *[
-                build_chunks(request[par], chunk_size)
-                for par, chunk_size in chunks.items()
-            ]
+    if not chunks:
+        requests.append(request)
+    else:
+        list_values = list(
+            itertools.product(
+                *[
+                    build_chunks(request[par], chunk_size)
+                    for par, chunk_size in chunks.items()
+                ]
+            )
         )
-    )
-    for values in list_values:
-        out_request = request.copy()
-        for parameter, value in zip(chunks, values):
-            out_request[parameter] = value
+        for values in list_values:
+            out_request = request.copy()
+            for parameter, value in zip(chunks, values):
+                out_request[parameter] = value
 
-        if not check_non_empty_date(out_request):
-            continue
+            if not check_non_empty_date(out_request):
+                continue
 
-        requests.append(out_request)
-    return requests
+            requests.append(out_request)
+    return [ensure_request_gets_cached(request) for request in requests]
+
+
+def ensure_request_gets_cached(request: dict[str, Any]) -> dict[str, Any]:
+    cacheable_request = {}
+    for k, v in sorted(request.items()):
+        if not isinstance(v, str):
+            try:
+                v = v[0] if len(v) == 1 else list(v)
+            except TypeError:
+                pass
+        cacheable_request[k] = v
+    return cacheable_request
 
 
 def get_sources(
@@ -314,7 +326,8 @@ def _preprocess(
     ds = cgul.harmonise(ds)
 
     # TODO: workaround: sometimes single timestamps are squeezed
-    if "time" not in ds.cf.dims:
+    time_dims = set(ds.cf.coordinates.get("time", [])) & set(ds.dims)
+    if not time_dims:
         if "forecast_reference_time" in ds.cf:
             ds = ds.cf.expand_dims("forecast_reference_time")
         elif "time" in ds:
