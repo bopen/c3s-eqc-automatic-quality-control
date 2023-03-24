@@ -326,8 +326,8 @@ def _preprocess(
     ds = cgul.harmonise(ds)
 
     # TODO: workaround: sometimes single timestamps are squeezed
-    time_dims = set(ds.cf.coordinates.get("time", [])) & set(ds.dims)
-    if not time_dims:
+    cf_time_dims = set(ds.cf.coordinates.get("time", [])) & set(ds.dims)
+    if not ("time" in ds.dims or cf_time_dims):
         if "forecast_reference_time" in ds.cf:
             ds = ds.cf.expand_dims("forecast_reference_time")
         elif "time" in ds:
