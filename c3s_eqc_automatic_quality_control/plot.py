@@ -193,11 +193,11 @@ def projected_map(
     kwargs.setdefault("transform", ccrs.PlateCarree())
 
     # Plot
-    p = da.plot(**kwargs)
+    plot_obj = da.plot(**kwargs)
 
     # Add coastlines and gridlines
-    if isinstance(p, FacetGrid):
-        for ax in p.axs.flat:
+    if isinstance(plot_obj, FacetGrid):
+        for ax in plot_obj.axs.flat:
             ax.coastlines()
             ax.gridlines()
 
@@ -206,10 +206,9 @@ def projected_map(
                 "`show_stats` must be False for FacetGrid plots.", UserWarning
             )
     else:
-        p.axes.coastlines()
-        gl = p.axes.gridlines(draw_labels=True)
-        gl.top_labels = False
-        gl.right_labels = False
+        plot_obj.axes.coastlines()
+        gl = plot_obj.axes.gridlines(draw_labels=True)
+        gl.top_labels = gl.right_labels = False
 
         # Compute statistics
         if (show_stats is None) or show_stats:
@@ -232,11 +231,11 @@ def projected_map(
                 txt,
                 ha="left",
                 va="center",
-                figure=p.figure,
+                figure=plot_obj.figure,
                 fontfamily="monospace",
             )
 
-    return p
+    return plot_obj
 
 
 def _infer_legend_dict(da: xr.DataArray) -> dict[str, tuple[COLOR_T, FLAGS_T]]:
@@ -387,7 +386,6 @@ def lccs_bar(
 
     # Set default kwargs
     if groupby_bins_dims:
-        kwargs.setdefault("stacked", True)
         kwargs.setdefault("xlabel", xr.plot.utils.label_from_attrs(da[groupby_dim]))
     else:
         kwargs.setdefault("xlabel", xr.plot.utils.label_from_attrs(da_lccs))

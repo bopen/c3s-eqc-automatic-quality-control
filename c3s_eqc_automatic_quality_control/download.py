@@ -479,7 +479,8 @@ def download_and_transform(
                 **open_mfdataset_kwargs,
             )
             sources.append(ds.encoding["source"])
-        ds = xr.open_mfdataset(sources)
+        open_mfdataset_kwargs.pop("preprocess", None)  # Already preprocessed
+        ds = xr.open_mfdataset(sources, **open_mfdataset_kwargs)
 
     ds.attrs.pop("coordinates", None)
     return ds
