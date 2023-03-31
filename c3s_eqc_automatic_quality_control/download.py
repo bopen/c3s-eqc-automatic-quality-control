@@ -24,7 +24,7 @@ import itertools
 import logging
 import pathlib
 from collections.abc import Callable
-from typing import Any, Iterable
+from typing import Any
 
 import cacholote
 import cads_toolbox
@@ -296,12 +296,12 @@ def ensure_request_gets_cached(request: dict[str, Any]) -> dict[str, Any]:
 
 def get_sources(
     collection_id: str,
-    request_list: Iterable[dict[str, Any]],
+    request_list: list[dict[str, Any]],
     exclude: list[str] = ["*.png", "*.json"],
 ) -> list[str]:
     source: set[str] = set()
 
-    for request in request_list:
+    for request in request_list if len(request_list) == 1 else tqdm.tqdm(request_list):
         data = cads_toolbox.catalogue.retrieve(collection_id, request).data
         if content := getattr(data, "_content", None):
             source.update(map(str, content))
@@ -356,7 +356,7 @@ def get_data(source: list[str]) -> Any:
 
 def _download_and_transform_requests(
     collection_id: str,
-    request_list: Iterable[dict[str, Any]],
+    request_list: list[dict[str, Any]],
     transform_func: Callable[..., xr.Dataset] | None,
     transform_func_kwargs: dict[str, Any],
     **open_mfdataset_kwargs: Any,
@@ -462,7 +462,7 @@ def download_and_transform(
     if not transform_chunks or transform_func is None:
         ds = download_and_transform_requests(
             collection_id,
-            tqdm.tqdm(request_list),
+            request_list,
             transform_func,
             transform_func_kwargs,
             **open_mfdataset_kwargs,

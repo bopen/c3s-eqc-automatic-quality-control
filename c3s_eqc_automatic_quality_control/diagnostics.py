@@ -127,6 +127,27 @@ def annual_weighted_mean(obj: xr.Dataset, time: str | None = None) -> xr.Dataset
     return obj
 
 
+def annual_weighted_mean_timeseries(
+    obj: xr.Dataset, time: str | None = None
+) -> xr.Dataset:
+    """
+    Calculate annual weighted mean timeseries.
+
+    Parameters
+    ----------
+    obj: xr.Dataset
+        Input data
+    time: str, optional
+        Name of time coordinate
+
+    Returns
+    -------
+    reduced object
+    """
+    time = utils._get_time(obj, time)
+    return obj.groupby(f"{time}.year").map(annual_weighted_mean)
+
+
 def _spatial_weighted_reduction(
     obj: xr.Dataset | xr.DataArray,
     func: str,
