@@ -56,11 +56,9 @@ def get_tasks(baseurl: str, user: str, passwd: str) -> Any:
     return res.json().get("content")
 
 
-def push_notebooks(
-    notebook_paths: str | list[str], repo_url: str, branch: str, user_dir: str
+def push_notebook(
+    notebook_path: str, repo_url: str, branch: str, user_dir: str
 ) -> None:
-    if isinstance(notebook_paths, str):
-        notebook_paths = [notebook_paths]
     if repo_url is None:
         repo_url = RENDERED
 
@@ -74,30 +72,18 @@ def push_notebooks(
         except FileExistsError:
             pass
         executed = []
-        for nb in notebook_paths:
-            # Move the file to the folder
-            shutil.copy(pathlib.Path(nb).resolve(), dest_dir)
+        # Move the file to the folder
+        shutil.copy(pathlib.Path(notebook_path).resolve(), dest_dir)
 
-            # Add the file
-            executed_nb = os.path.basename(nb)
-            executed.append(executed_nb)
-            repo.git.add(f"{dest_dir}/{executed_nb}")
-        commit_message = f"Add notebooks: {', '.join(executed)}"
+        # Add the file
+        executed_nb = os.path.basename(notebook_path)
+        executed.append(executed_nb)
+        repo.git.add(f"{dest_dir}/{executed_nb}")
+
         # Commit the file
+        commit_message = f"Add notebooks: {', '.join(executed)}"
         repo.index.commit(commit_message)
 
         # Push the changes
         origin = repo.remote(name="origin")
         origin.push(refspec=f"{branch}:{branch}")
-
-
-def push_qar(workdir: str, repo_url: str, branch: str, user_dir: str) -> None:
-    notebook_paths = [
-        str(nb.absolute()) for nb in pathlib.Path(workdir).glob("*.ipynb")
-    ]
-    push_notebooks(
-        notebook_paths=notebook_paths,
-        repo_url=repo_url,
-        branch=branch,
-        user_dir=user_dir,
-    )

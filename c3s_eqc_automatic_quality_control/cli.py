@@ -104,30 +104,14 @@ def list_task(
 
 @app.command(name="push-notebook")
 def push(
-    notebook_paths: str,
+    notebook_path: str,
     repo_url: str = typer.Option(None, "--repo", "-r"),
     branch: str = typer.Option("notebooks", "--branch", "-b"),
     user_dir: str = typer.Option("user", "--user", "-u"),
 ) -> None:
     """Push rendered notebooks."""
-    cim.push_notebooks(
-        notebook_paths=notebook_paths,
-        repo_url=repo_url,
-        branch=branch,
-        user_dir=user_dir,
-    )
-
-
-@app.command(name="push-qar")
-def push_qar(
-    workdir: str,
-    repo_url: str = typer.Option(None, "--repo", "-r"),
-    branch: str = typer.Option("notebooks", "--branch", "-b"),
-    user_dir: str = typer.Option("user", "--user", "-u"),
-) -> None:
-    """Push all rendered notebooks in QAR working folder."""
-    cim.push_qar(
-        workdir=workdir,
+    cim.push_notebook(
+        notebook_path=notebook_path,
         repo_url=repo_url,
         branch=branch,
         user_dir=user_dir,
