@@ -30,8 +30,6 @@ API_USER_VAR_NAME = "EQC_AQC_API_USER"
 API_PWD_VAR_NAME = "EQC_AQC_API_PWD"
 CIM = "https://cds2-backoffice-dev.copernicus-climate.eu/api/v1/"
 RENDERED = "https://github.com/bopen/c3s-eqc-toolbox-template.git"
-API_USER = None
-API_PWD = None
 
 
 def http_request(url: str, request: str = "get", **kwargs: Any) -> Any:
@@ -43,17 +41,13 @@ def http_request(url: str, request: str = "get", **kwargs: Any) -> Any:
 
 
 def get_api_credentials() -> Tuple[str, str]:
-    global API_USER
-    global API_PWD
-    if API_USER is None and API_PWD is None:
-        user = os.environ.get(API_USER_VAR_NAME)
-        pwd = os.environ.get(API_PWD_VAR_NAME)
-        if user is None or pwd is None:
-            raise ValueError(
-                "No authentication provided. EQC_AQC_API_USER and EQC_AQC_API_PWD need to be set."
-            )
-        API_USER, API_PWD = user, pwd
-    return API_USER, API_PWD
+    user = os.environ.get(API_USER_VAR_NAME)
+    pwd = os.environ.get(API_PWD_VAR_NAME)
+    if user is None or pwd is None:
+        raise ValueError(
+            "No authentication provided. EQC_AQC_API_USER and EQC_AQC_API_PWD need to be set."
+        )
+    return user, pwd
 
 
 def get_tasks(baseurl: str, user: str, passwd: str) -> Any:

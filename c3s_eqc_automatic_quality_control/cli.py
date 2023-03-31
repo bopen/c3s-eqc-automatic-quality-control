@@ -60,7 +60,7 @@ def run(
     notebook_path: str,
     qar_id: str = typer.Option("000", "--qar-id", "-q"),
     run_n: str = typer.Option("0", "--run-n", "-n"),
-    target_dir: str = typer.Option("rendered_notebooks", "--target-dir", "-t"),
+    target_dir: str = typer.Option(".", "--target-dir", "-t"),
 ) -> None:
     """Run notebook."""
     runner.run(
@@ -96,7 +96,7 @@ def list_task(
     passwd: str = typer.Option(None, "--pass", "-p"),
 ) -> None:
     """List QAR tasks."""
-    if any([user, passwd]) is None:
+    if None in (user, passwd):
         user, passwd = cim.get_api_credentials()
     res = cim.get_tasks(base_url, user=user, passwd=passwd)
     rich.print(res)
