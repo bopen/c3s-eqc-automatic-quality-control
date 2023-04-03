@@ -104,7 +104,9 @@ def shaded_std(
             if not isinstance(rgb, tuple):
                 rgb = pc.hex_to_rgb(rgb)
 
-            da_mean = mean[var].where(mean[var].notnull(), drop=True).squeeze()
+            da_mean = (
+                mean[var].where(mean[var].notnull().compute(), drop=True).squeeze()
+            )
             if da_mean.size <= 1:
                 continue
 
@@ -127,7 +129,9 @@ def shaded_std(
                 )
             )
             if std:
-                da_std = std[var].where(mean[var].notnull(), drop=True).squeeze()
+                da_std = (
+                    std[var].where(mean[var].notnull().compute(), drop=True).squeeze()
+                )
                 data.append(
                     go.Scatter(
                         name="Upper Bound",
