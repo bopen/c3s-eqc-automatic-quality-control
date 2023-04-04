@@ -168,8 +168,9 @@ colormap = "YlOrRd"
 
 def projected_map(
     da: xr.DataArray,
-    projection: ccrs.Projection = ccrs.Robinson(),
+    projection: ccrs.Projection = ccrs.PlateCarree(),
     show_stats: bool | None = None,
+    plot_func: str | None = None,
     **kwargs: Any,
 ) -> GeoQuadMesh | FacetGrid[Any]:
     """Plot projected map.
@@ -180,6 +181,10 @@ def projected_map(
         DataArray to plot
     projection: ccrs.Projection
         Projection for the plot
+    show_stats: bool, optional
+        Whether to show or not a box with statistics
+    plot_func: str, optional
+        Plotting function (e.g., pcolormesh, contourf, ...)
     **kwargs:
         Keyword arguments for `xr.plot`
 
@@ -188,12 +193,13 @@ def projected_map(
     GeoQuadMesh or FacetGrid
     """
     # Set defaults
-    subplot_kws = kwargs.setdefault("subplot_kws", dict())
-    subplot_kws.setdefault("projection", projection)
     kwargs.setdefault("transform", ccrs.PlateCarree())
+    if "ax" not in kwargs:
+        subplot_kws = kwargs.setdefault("subplot_kws", dict())
+        subplot_kws.setdefault("projection", projection)
 
     # Plot
-    plot_obj = da.plot(**kwargs)
+    plot_obj = (da.plot if plot_func is None else getattr(da.plot, plot_func))(**kwargs)
 
     # Add coastlines and gridlines
     if isinstance(plot_obj, FacetGrid):
@@ -207,8 +213,9 @@ def projected_map(
             )
     else:
         plot_obj.axes.coastlines()
-        gl = plot_obj.axes.gridlines(draw_labels=True)
-        gl.top_labels = gl.right_labels = False
+        if not getattr(plot_obj.axes, "_gridliners", []):
+            gl = plot_obj.axes.gridlines(draw_labels=True)
+            gl.top_labels = gl.right_labels = False
 
         # Compute statistics
         if (show_stats is None) or show_stats:
