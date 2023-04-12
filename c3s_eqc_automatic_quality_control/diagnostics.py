@@ -379,7 +379,7 @@ def spatial_weighted_errors(
 
 
 def grid_cell_area(
-    obj: xr.Dataset | xr.DataArray, earth_radius_m: float = 6367.47e3
+    obj: xr.Dataset | xr.DataArray, earth_radius_m: float = 6_367.47e3
 ) -> xr.DataArray:
     """
     Calculate the area of a cell, in meters^2, on a lat/lon grid.
