@@ -376,3 +376,57 @@ def spatial_weighted_errors(
     if isinstance(obj1, xr.DataArray):
         return ds[obj1.name]
     return ds
+
+
+def grid_cell_area(
+    obj: xr.Dataset | xr.DataArray, earth_radius_m: float = 6_367.47e3
+) -> xr.DataArray:
+    """
+    Calculate the area of a cell, in meters^2, on a lat/lon grid.
+
+    Parameters
+    ----------
+    obj: xr.Dataset or xr.DataArray
+        Input object with coordinates
+    earth_radius_m: float
+        Earth radius in m (default is ERA5)
+
+    Returns
+    -------
+    xr.DataArray
+        Grid cell area
+
+    Notes
+    -----
+    This applies the following equation from Santinie et al. 2010 [1]_
+
+    S = (λ_2 - λ_1)(sinφ_2 - sinφ_1)R^2
+
+    S = surface area of cell on sphere
+    λ_1, λ_2, = bands of longitude in radians
+    φ_1, φ_2 = bands of latitude in radians
+    R = radius of the sphere
+
+    References
+    ----------
+    .. [1] Santini, M., Taramelli, A. and Sorichetta, A. (2010), ASPHAA: A GIS-Based
+           Algorithm to Calculate Cell Area on a Latitude-Longitude (Geographic)
+           Regular Grid. Transactions in GIS, 14: 351-377.
+           https://doi.org/10.1111/j.1467-9671.2010.01200.x
+    """
+    for coord in ("longitude", "latitude"):
+        if coord not in obj.cf.bounds:
+            obj = obj.cf.add_bounds(coord)
+
+    lon_bounds = obj.cf.get_bounds("longitude")
+    (lon_bounds_dim,) = set(lon_bounds.dims) - set(obj.cf["longitude"].dims)
+    a = np.deg2rad(lon_bounds).diff(lon_bounds_dim)
+
+    lat_bounds = obj.cf.get_bounds("latitude")
+    (lat_bounds_dim,) = set(lat_bounds.dims) - set(obj.cf["latitude"].dims)
+    b = np.sin(np.deg2rad(lat_bounds)).diff(lat_bounds_dim)
+
+    area = np.abs(a * b * earth_radius_m**2).squeeze()
+    area.attrs["standard_name"] = "cell_area"
+    cf_area: xr.DataArray = area.cf.add_canonical_attributes()
+    return cf_area
