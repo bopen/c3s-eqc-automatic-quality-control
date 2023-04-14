@@ -380,12 +380,6 @@ def spatial_weighted_errors(
     return ds
 
 
-def _bounds_to_dict(bounds: xr.DataArray) -> dict[str, Any]:
-    bounds_dict = bounds.to_dict()
-    bounds_dict.pop("attrs")
-    return bounds_dict
-
-
 def _poly_area(lon_bounds, lat_bounds, geod):  # type: ignore  # TODO: add typing
     if len(lon_bounds) == len(lat_bounds) == 2:
         lon_bounds = sorted(lon_bounds) + sorted(lon_bounds, reverse=True)
