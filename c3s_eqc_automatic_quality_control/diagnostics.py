@@ -21,6 +21,8 @@ from typing import Any
 
 import cacholote
 import numpy as np
+import pyproj
+import shapely
 import xarray as xr
 import xesmf as xe
 
@@ -378,8 +380,42 @@ def spatial_weighted_errors(
     return ds
 
 
+def _bounds_to_dict(bounds: xr.DataArray) -> dict[str, Any]:
+    bounds_dict = bounds.to_dict()
+    bounds_dict.pop("attrs")
+    return bounds_dict
+
+
+def _poly_area(lon_bounds, lat_bounds, geod):  # type: ignore  # TODO: add typing
+    if len(lon_bounds) == len(lat_bounds) == 2:
+        lon_bounds = sorted(lon_bounds) + sorted(lon_bounds, reverse=True)
+        lat_bounds = [lat for lat in lat_bounds for _ in range(2)]
+    polygon = shapely.Polygon(zip(lon_bounds, lat_bounds))
+    return abs(geod.geometry_area_perimeter(polygon)[0])
+
+
+@cacholote.cacheable
+def _cached_grid_cell_area(
+    lon_bounds: dict[str, Any],
+    lat_bounds: dict[str, Any],
+    bounds_dim: set[str],
+    geod: pyproj.Geod,
+) -> xr.Dataset:
+    area = xr.apply_ufunc(
+        _poly_area,
+        xr.DataArray.from_dict(lon_bounds),
+        xr.DataArray.from_dict(lat_bounds),
+        input_core_dims=[tuple(bounds_dim) for _ in range(2)],
+        kwargs={"geod": geod},
+        vectorize=True,
+    )
+    area.attrs["standard_name"] = "cell_area"
+    cf_area: xr.DataArray = area.cf.add_canonical_attributes()
+    return cf_area.to_dataset(name="cell_area")
+
+
 def grid_cell_area(
-    obj: xr.Dataset | xr.DataArray, earth_radius_m: float = 6_367.47e3
+    obj: xr.Dataset | xr.DataArray, geod: pyproj.Geod = pyproj.Geod(ellps="WGS84")
 ) -> xr.DataArray:
     """
     Calculate the area of a cell, in meters^2, on a lat/lon grid.
@@ -388,45 +424,20 @@ def grid_cell_area(
     ----------
     obj: xr.Dataset or xr.DataArray
         Input object with coordinates
-    earth_radius_m: float
-        Earth radius in m (default is ERA5)
+    geod: pyproj.Geod
+        Projection (default is WGS84)
 
     Returns
     -------
     xr.DataArray
         Grid cell area
-
-    Notes
-    -----
-    This applies the following equation from Santinie et al. 2010 [1]_
-
-    S = (λ_2 - λ_1)(sinφ_2 - sinφ_1)R^2
-
-    S = surface area of cell on sphere
-    λ_1, λ_2, = bands of longitude in radians
-    φ_1, φ_2 = bands of latitude in radians
-    R = radius of the sphere
-
-    References
-    ----------
-    .. [1] Santini, M., Taramelli, A. and Sorichetta, A. (2010), ASPHAA: A GIS-Based
-           Algorithm to Calculate Cell Area on a Latitude-Longitude (Geographic)
-           Regular Grid. Transactions in GIS, 14: 351-377.
-           https://doi.org/10.1111/j.1467-9671.2010.01200.x
     """
+    bounds = []
+    bounds_dim = set()
     for coord in ("longitude", "latitude"):
         if coord not in obj.cf.bounds:
             obj = obj.cf.add_bounds(coord)
-
-    lon_bounds = obj.cf.get_bounds("longitude")
-    (lon_bounds_dim,) = set(lon_bounds.dims) - set(obj.cf["longitude"].dims)
-    a = np.deg2rad(lon_bounds).diff(lon_bounds_dim)
-
-    lat_bounds = obj.cf.get_bounds("latitude")
-    (lat_bounds_dim,) = set(lat_bounds.dims) - set(obj.cf["latitude"].dims)
-    b = np.sin(np.deg2rad(lat_bounds)).diff(lat_bounds_dim)
-
-    area = np.abs(a * b * earth_radius_m**2).squeeze()
-    area.attrs["standard_name"] = "cell_area"
-    cf_area: xr.DataArray = area.cf.add_canonical_attributes()
-    return cf_area
+        da = obj.cf.get_bounds(coord)
+        bounds_dim.update(set(da.dims) - set(obj.cf[coord].dims))
+        bounds.append(da.to_dict())
+    return _cached_grid_cell_area(bounds[0], bounds[1], bounds_dim, geod)["cell_area"]

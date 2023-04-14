@@ -36,6 +36,7 @@ module = [
   "emohawk.*",
   "matplotlib.*",
   "plotly.*",
+  "shapely",
   "xesmf"
 ]
 
