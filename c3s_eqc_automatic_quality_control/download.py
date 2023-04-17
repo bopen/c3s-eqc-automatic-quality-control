@@ -313,6 +313,39 @@ def get_sources(
     return list(source)
 
 
+def _add_bounds(ds: xr.Dataset) -> xr.Dataset:
+    # TODO: cgul should make bounds coordinates
+    bounds = set(sum(ds.cf.bounds.values(), []))
+    bounds.update(
+        {
+            var
+            for var, da in ds.data_vars.items()
+            if set(da.dims) & {"bnds", "bounds", "vertices"}
+        }
+    )
+    ds = ds.set_coords(bounds)
+    for var_names in ds.cf.coordinates.values():
+        if len(var_names) == 2:
+            coord_name, bound_name = sorted(var_names, key=lambda x: len(ds[x].dims))
+            if len(set(ds[bound_name].dims) - set(ds[coord_name].dims)) == 1:
+                ds[coord_name].attrs.setdefault("bounds", bound_name)
+    return ds
+
+
+def harmonise(ds: xr.Dataset) -> xr.Dataset:
+    # TODO: additional rules to cgul
+    ds = cgul.harmonise(ds)
+
+    # Some satellite data have dimension "pressure" but coordinate "pre"
+    if "pre" in ds.data_vars:
+        da = ds["pre"]
+        if set(da.dims) == {"pressure"} and "pressure" not in ds.variables:
+            ds = ds.assign_coords(pressure=da)
+        ds = ds.drop("pre")
+
+    return ds
+
+
 def _preprocess(
     ds: xr.Dataset,
     collection_id: str,
@@ -323,7 +356,7 @@ def _preprocess(
     if preprocess is not None:
         ds = preprocess(ds)
 
-    ds = cgul.harmonise(ds)
+    ds = harmonise(ds)
 
     # TODO: workaround: sometimes single timestamps are squeezed
     cf_time_dims = set(ds.cf.coordinates.get("time", [])) & set(ds.dims)
@@ -335,9 +368,7 @@ def _preprocess(
         elif collection_id.startswith("satellite-") and source:
             ds = ds.expand_dims(source=[pathlib.Path(source).stem])
 
-    # TODO: workaround: cgul should make bounds coordinates
-    bounds = set(sum(ds.cf.bounds.values(), []))
-    ds = ds.set_coords(bounds)
+    ds = _add_bounds(ds)
 
     if source:
         ds.encoding["source"] = source
