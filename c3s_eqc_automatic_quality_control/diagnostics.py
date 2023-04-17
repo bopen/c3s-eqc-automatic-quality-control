@@ -49,7 +49,10 @@ def _regridder_weights(
 
 
 def _grid_to_dict(grid: xr.Dataset) -> dict[str, Any]:
-    coords = grid.cf.coordinates["longitude"] + grid.cf.coordinates["latitude"]
+    coords = []
+    for coord in ("longitude", "latitude"):
+        coords.extend(grid.cf.coordinates[coord])
+        coords.extend(grid.cf.bounds.get(coord, []))
     grid_dict: dict[str, Any] = grid[coords].to_dict()
     grid_dict.pop("attrs")
     return grid_dict
