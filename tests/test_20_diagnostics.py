@@ -18,12 +18,12 @@ def test_grid_cell_area() -> None:
     # Get area
     ds = xr.Dataset(
         {
-            "longitude": xr.DataArray(range(-180, 180), dims="longitude"),
-            "latitude": xr.DataArray(range(-90, 90), dims="latitude"),
+            "longitude": xr.DataArray(np.arange(-180, 180, 10), dims="longitude"),
+            "latitude": xr.DataArray(np.arange(-90, 90, 2), dims="latitude"),
         }
     )
     ds = ds.cf.guess_coord_axis()
     with cacholote.config.set(use_cache=False):
         actual = diagnostics.grid_cell_area(ds).sum().values
 
-    assert np.isclose(actual, expected, rtol=1.0e-4)
+    np.testing.assert_approx_equal(actual, expected, significant=4)

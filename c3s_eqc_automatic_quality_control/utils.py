@@ -26,13 +26,23 @@ def _get_time(obj: xr.Dataset | xr.DataArray, time: str | None) -> str:
     raise ValueError("Can NOT auto infer time dimension.")
 
 
+def _get_coord_excluding_bounds(obj: xr.Dataset | xr.DataArray, coord_name: str) -> str:
+    coords: list[str] = obj.cf.coordinates[coord_name]
+    if isinstance(obj, xr.Dataset):
+        bounds = obj.cf.bounds.get(coord_name, [])
+        coords = list(set(coords) - set(bounds))
+    if len(coords) == 1:
+        return coords[0]
+    raise ValueError(f"Can not infer {coord_name!r}: {coords!r}")
+
+
 def _get_lon_and_lat(
     obj: xr.Dataset | xr.DataArray, lon: str | None, lat: str | None
 ) -> tuple[str, str]:
     if lon is None:
-        (lon,) = obj.cf.coordinates["longitude"]
+        lon = _get_coord_excluding_bounds(obj, "longitude")
     if lat is None:
-        (lat,) = obj.cf.coordinates["latitude"]
+        lat = _get_coord_excluding_bounds(obj, "latitude")
     return lon, lat
 
 
