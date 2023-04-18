@@ -19,7 +19,7 @@ def mock_download(
     ds = xr.tutorial.open_dataset(collection_id).sel(**request)
     with tempfile.NamedTemporaryFile(suffix=".nc", delete=False) as f:
         filename = f.name
-        ds.to_netcdf(filename)
+    ds.to_netcdf(filename)
     with fsspec.open(filename, "rb") as f:
         return f
 
@@ -302,7 +302,7 @@ def test_ensure_request_gets_cached() -> None:
         ({}, {"time": (2,), "latitude": (25,), "longitude": (53,)}),
     ],
 )
-def test_donwload_and_transform(
+def test_donwload_no_transform(
     monkeypatch: pytest.MonkeyPatch,
     chunks: dict[str, int],
     dask_chunks: dict[str, tuple[int, ...]],
@@ -313,5 +313,32 @@ def test_donwload_and_transform(
         collection_id="air_temperature",
         requests={"time": ["2013-01-01T00", "2013-01-02T00"]},
         chunks=chunks,
+    )
+    assert dict(ds.chunks) == dask_chunks
+
+
+@pytest.mark.parametrize(
+    "transform_chunks, dask_chunks",
+    [
+        (True, {"time": (1, 1)}),
+        (False, {"time": (2,)}),
+    ],
+)
+def test_donwload_and_transform(
+    monkeypatch: pytest.MonkeyPatch,
+    transform_chunks: bool,
+    dask_chunks: dict[str, tuple[int, ...]],
+) -> None:
+    monkeypatch.setattr(cads_toolbox.catalogue, "_download", mock_download)
+
+    def transform_func(ds: xr.Dataset) -> xr.Dataset:
+        return ds.mean(("longitude", "latitude"))
+
+    ds = download.download_and_transform(
+        collection_id="air_temperature",
+        requests={"time": ["2013-01-01T00", "2013-01-02T00"]},
+        chunks={"time": 1},
+        transform_chunks=transform_chunks,
+        transform_func=transform_func,
     )
     assert dict(ds.chunks) == dask_chunks
