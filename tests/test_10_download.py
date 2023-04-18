@@ -1,7 +1,27 @@
+import pathlib
+import tempfile
+from typing import Any
+
+import cads_toolbox
+import fsspec
 import pandas as pd
 import pytest
+import xarray as xr
 
 from c3s_eqc_automatic_quality_control import download
+
+
+def mock_download(
+    collection_id: str,
+    request: dict[str, Any],
+    target: str | pathlib.Path | None = None,
+) -> fsspec.spec.AbstractBufferedFile:
+    ds = xr.tutorial.open_dataset(collection_id).sel(**request)
+    with tempfile.NamedTemporaryFile(suffix=".nc", delete=False) as f:
+        filename = f.name
+        ds.to_netcdf(filename)
+    with fsspec.open(filename, "rb") as f:
+        return f
 
 
 def test_split_request() -> None:
@@ -273,3 +293,25 @@ def test_ensure_request_gets_cached() -> None:
     request = {"f": [2, 1], "e": [1], "d": 1, "c": ["b", "a"], "b": ["ba"], "a": "ba"}
     expected = {"a": "ba", "b": "ba", "c": ["b", "a"], "d": 1, "e": 1, "f": [2, 1]}
     assert download.ensure_request_gets_cached(request) == expected
+
+
+@pytest.mark.parametrize(
+    "chunks, dask_chunks",
+    [
+        ({"time": 1}, {"time": (1, 1), "latitude": (25,), "longitude": (53,)}),
+        ({}, {"time": (2,), "latitude": (25,), "longitude": (53,)}),
+    ],
+)
+def test_donwload_and_transform(
+    monkeypatch: pytest.MonkeyPatch,
+    chunks: dict[str, int],
+    dask_chunks: dict[str, tuple[int, ...]],
+) -> None:
+    monkeypatch.setattr(cads_toolbox.catalogue, "_download", mock_download)
+
+    ds = download.download_and_transform(
+        collection_id="air_temperature",
+        requests={"time": ["2013-01-01T00", "2013-01-02T00"]},
+        chunks=chunks,
+    )
+    assert dict(ds.chunks) == dask_chunks
