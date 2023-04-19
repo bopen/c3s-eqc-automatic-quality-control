@@ -298,8 +298,8 @@ def test_ensure_request_gets_cached() -> None:
 @pytest.mark.parametrize(
     "chunks, dask_chunks",
     [
-        ({"time": 1}, {"time": (1, 1), "latitude": (25,), "longitude": (53,)}),
-        ({}, {"time": (2,), "latitude": (25,), "longitude": (53,)}),
+        ({"time": 1}, {"time": (1, 1), "latitude": (2,), "longitude": (2,)}),
+        ({}, {"time": (2,), "latitude": (2,), "longitude": (2,)}),
     ],
 )
 def test_donwload_no_transform(
@@ -311,7 +311,11 @@ def test_donwload_no_transform(
 
     ds = download.download_and_transform(
         collection_id="air_temperature",
-        requests={"time": ["2013-01-01T00", "2013-01-02T00"]},
+        requests={
+            "time": ["2013-01-01T00", "2013-01-02T00"],
+            "lat": [75.0, 72.5],
+            "lon": [200.0, 202.5],
+        },
         chunks=chunks,
     )
     assert dict(ds.chunks) == dask_chunks
@@ -332,13 +336,18 @@ def test_donwload_and_transform(
     monkeypatch.setattr(cads_toolbox.catalogue, "_download", mock_download)
 
     def transform_func(ds: xr.Dataset) -> xr.Dataset:
-        return ds.mean(("longitude", "latitude"))
+        return ds.mean(("longitude", "latitude")).round()
 
     ds = download.download_and_transform(
         collection_id="air_temperature",
-        requests={"time": ["2013-01-01T00", "2013-01-02T00"]},
+        requests={
+            "time": ["2013-01-01T00", "2013-01-02T00"],
+            "lat": [75.0, 72.5],
+            "lon": [200.0, 202.5],
+        },
         chunks={"time": 1},
         transform_chunks=transform_chunks,
         transform_func=transform_func,
     )
     assert dict(ds.chunks) == dask_chunks
+    assert ds["air"].values.tolist() == [243, 244]
