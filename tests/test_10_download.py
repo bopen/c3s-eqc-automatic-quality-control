@@ -10,11 +10,11 @@ from utils import mock_download
 from c3s_eqc_automatic_quality_control import download
 
 AIR_TEMPERATURE_REQUEST = (
-    "air_temperature",
+    "era5-2mt-2019-03-uk.grib",
     {
-        "time": ["2013-01-01T00", "2013-01-02T00"],
-        "lat": [75.0, 72.5],
-        "lon": [200.0, 202.5],
+        "time": ["2019-03-01T00", "2019-03-02T00"],
+        "latitude": [58, 50],
+        "longitude": [-10, 2],
     },
 )
 
@@ -244,8 +244,14 @@ def test_ensure_request_gets_cached() -> None:
 @pytest.mark.parametrize(
     "chunks, dask_chunks",
     [
-        ({"time": 1}, {"time": (1, 1), "latitude": (2,), "longitude": (2,)}),
-        ({}, {"time": (2,), "latitude": (2,), "longitude": (2,)}),
+        (
+            {"time": 1},
+            {"forecast_reference_time": (1, 1), "latitude": (2,), "longitude": (2,)},
+        ),
+        (
+            {},
+            {"forecast_reference_time": (2,), "latitude": (2,), "longitude": (2,)},
+        ),
     ],
 )
 def test_donwload_no_transform(
@@ -262,8 +268,8 @@ def test_donwload_no_transform(
 @pytest.mark.parametrize(
     "transform_chunks, dask_chunks",
     [
-        (True, {"time": (1, 1)}),
-        (False, {"time": (2,)}),
+        (True, {"forecast_reference_time": (1, 1)}),
+        (False, {"forecast_reference_time": (2,)}),
     ],
 )
 def test_donwload_and_transform(
@@ -283,4 +289,4 @@ def test_donwload_and_transform(
         transform_func=transform_func,
     )
     assert dict(ds.chunks) == dask_chunks
-    assert ds["air"].values.tolist() == [243, 244]
+    assert ds["t2m"].values.tolist() == [282, 281]
