@@ -34,6 +34,7 @@ module = [
   "cartopy.*",
   "cgul",
   "emohawk.*",
+  "fsspec",
   "matplotlib.*",
   "plotly.*",
   "shapely",
