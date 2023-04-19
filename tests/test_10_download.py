@@ -1,3 +1,4 @@
+import datetime
 from typing import Any
 
 import cads_toolbox
@@ -31,20 +32,7 @@ def test_split_request(chunks: dict[str, int], split_all: bool, length: int) -> 
         "pressure_level": ["1", "2", "3"],
         "day": "01",
         "year": ["2019", "2020", "2021", "2022"],
-        "month": [
-            "01",
-            "02",
-            "03",
-            "04",
-            "05",
-            "06",
-            "07",
-            "08",
-            "09",
-            "10",
-            "11",
-            "12",
-        ],
+        "month": list(range(1, 13)),
     }
     requests = download.split_request(request, chunks=chunks, split_all=split_all)
     assert len(requests) == length
@@ -211,6 +199,20 @@ def test_extract_years() -> None:
 )
 def test_update_request(start: str, stop: str, length: int) -> None:
     requests = download.update_request_date({}, start, stop)
+    assert len(requests) == length
+
+
+@pytest.mark.parametrize("switch_month_day,length", [(0, 1), (32, 0)])
+def test_update_request_no_stop(switch_month_day: int, length: int) -> None:
+    prev_month = (
+        datetime.date.today().replace(day=1) - datetime.timedelta(days=1)
+    ).strftime("%Y-%m")
+    requests = download.update_request_date(
+        {},
+        start=prev_month,
+        stop=None,
+        switch_month_day=switch_month_day,
+    )
     assert len(requests) == length
 
 

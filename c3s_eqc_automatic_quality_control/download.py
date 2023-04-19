@@ -62,18 +62,17 @@ def compute_stop_date(switch_month_day: int | None = None) -> pd.Period:
 
 def ceil_to_month(period: pd.Period, month: int = 1) -> pd.Period:
     if period.month > month:
-        period = pd.Period(year=period.year + 1, month=month, freq="M")
+        return pd.Period(year=period.year + 1, month=month, freq="M")
     if period.month < month:
-        period = pd.Period(year=period.year, month=month, freq="M")
+        return pd.Period(year=period.year, month=month, freq="M")
     return period
 
 
 def floor_to_month(period: pd.Period, month: int = 1) -> pd.Period:
     if period.month > month:
-        period = pd.Period(year=period.year, month=month, freq="M")
+        return pd.Period(year=period.year, month=month, freq="M")
     if period.month < month:
-        period = pd.Period(year=period.year - 1, month=month, freq="M")
-
+        return pd.Period(year=period.year - 1, month=month, freq="M")
     return period
 
 
