@@ -6,23 +6,20 @@ from utils import mock_download
 
 from c3s_eqc_automatic_quality_control import download
 
+AIR_TEMPERATURE_REQUEST = (
+    "air_temperature",
+    {
+        "time": ["2013-01-01T00", "2013-01-02T00"],
+        "lat": [75.0, 72.5],
+        "lon": [200.0, 202.5],
+    },
+)
+
 
 def test_split_request() -> None:
     request = {
-        "product_type": "reanalysis",
-        "format": "grib",
-        "variable": "temperature",
-        "pressure_level": [
-            "1",
-            "2",
-            "3",
-        ],
-        "year": [
-            "2019",
-            "2020",
-            "2021",
-            "2022",
-        ],
+        "pressure_level": ["1", "2", "3"],
+        "year": ["2019", "2020", "2021", "2022"],
         "month": [
             "01",
             "02",
@@ -38,7 +35,6 @@ def test_split_request() -> None:
             "12",
         ],
         "day": "01",
-        "time": "00:00",
     }
 
     requests = download.split_request(request, {"month": 1})
@@ -70,35 +66,19 @@ def test_build_chunks() -> None:
 
 
 def test_check_non_empty_date() -> None:
-    request = {
-        "year": "2021",
-        "month": ["01", "02", "03"],
-        "day": ["30", "31"],
-    }
+    request = {"year": "2021", "month": ["01", "02", "03"], "day": ["30", "31"]}
 
     assert download.check_non_empty_date(request)
 
-    request = {
-        "year": "2021",
-        "month": "03",
-        "day": "30",
-    }
+    request = {"year": "2021", "month": "03", "day": "30"}
 
     assert download.check_non_empty_date(request)
 
-    request = {
-        "year": "2021",
-        "month": ["02", "04"],
-        "day": "31",
-    }
+    request = {"year": "2021", "month": ["02", "04"], "day": "31"}
 
     assert not download.check_non_empty_date(request)
 
-    request = {
-        "year": "2021",
-        "month": "02",
-        "day": ["30", "31"],
-    }
+    request = {"year": "2021", "month": "02", "day": ["30", "31"]}
 
     assert not download.check_non_empty_date(request)
 
@@ -292,15 +272,7 @@ def test_donwload_no_transform(
 ) -> None:
     monkeypatch.setattr(cads_toolbox.catalogue, "_download", mock_download)
 
-    ds = download.download_and_transform(
-        collection_id="air_temperature",
-        requests={
-            "time": ["2013-01-01T00", "2013-01-02T00"],
-            "lat": [75.0, 72.5],
-            "lon": [200.0, 202.5],
-        },
-        chunks=chunks,
-    )
+    ds = download.download_and_transform(*AIR_TEMPERATURE_REQUEST, chunks=chunks)
     assert dict(ds.chunks) == dask_chunks
 
 
@@ -322,12 +294,7 @@ def test_donwload_and_transform(
         return ds.mean(("longitude", "latitude")).round()
 
     ds = download.download_and_transform(
-        collection_id="air_temperature",
-        requests={
-            "time": ["2013-01-01T00", "2013-01-02T00"],
-            "lat": [75.0, 72.5],
-            "lon": [200.0, 202.5],
-        },
+        *AIR_TEMPERATURE_REQUEST,
         chunks={"time": 1},
         transform_chunks=transform_chunks,
         transform_func=transform_func,
