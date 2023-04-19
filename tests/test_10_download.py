@@ -12,7 +12,7 @@ from c3s_eqc_automatic_quality_control import download
 AIR_TEMPERATURE_REQUEST = (
     "era5-2mt-2019-03-uk.grib",
     {
-        "time": ["2019-03-01T00", "2019-03-02T00"],
+        "time": ["2019-03-01T00", "2019-03-31T23"],
         "latitude": [58, 50],
         "longitude": [-10, 2],
     },
@@ -280,7 +280,7 @@ def test_donwload_and_transform(
     monkeypatch.setattr(cads_toolbox.catalogue, "_download", mock_download)
 
     def transform_func(ds: xr.Dataset) -> xr.Dataset:
-        return ds.mean(("longitude", "latitude")).round()
+        return ds.round().mean(("longitude", "latitude"))
 
     ds = download.download_and_transform(
         *AIR_TEMPERATURE_REQUEST,
@@ -289,4 +289,4 @@ def test_donwload_and_transform(
         transform_func=transform_func,
     )
     assert dict(ds.chunks) == dask_chunks
-    assert ds["t2m"].values.tolist() == [282, 281]
+    assert ds["t2m"].values.tolist() == [281.75, 280.75]
