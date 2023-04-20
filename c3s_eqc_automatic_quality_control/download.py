@@ -477,8 +477,7 @@ def download_and_transform(
     logger = logger or LOGGER  # TODO: just for backward compatibility with runner
 
     download_and_transform_requests = _download_and_transform_requests
-    if transform_func is not None:
-        # Cache results
+    if is_cached := transform_func is not None:
         download_and_transform_requests = cacholote.cacheable(
             download_and_transform_requests
         )
@@ -488,7 +487,7 @@ def download_and_transform(
     for request in ensure_list(requests):
         request_list.extend(split_request(request, chunks, split_all))
 
-    if not transform_chunks or transform_func is None:
+    if not transform_chunks or not is_cached:
         ds = download_and_transform_requests(
             collection_id,
             request_list,

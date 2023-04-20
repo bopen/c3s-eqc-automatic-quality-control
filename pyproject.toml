@@ -38,6 +38,7 @@ module = [
   "matplotlib.*",
   "plotly.*",
   "shapely",
+  "sklearn.*",
   "xesmf"
 ]
 

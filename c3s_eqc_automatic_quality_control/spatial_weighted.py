@@ -84,7 +84,7 @@ class SpatialWeighted:
         self, obj: xr.DataArray | xr.Dataset, **kwargs: Any
     ) -> xr.DataArray | xr.Dataset:
         weighted_obj = SpatialWeighted(obj, **self.coords)
-        central_prod = self.obj.centralise(**kwargs) * weighted_obj.centralise(**kwargs)
+        central_prod = self.centralise(**kwargs) * weighted_obj.centralise(**kwargs)
         weighted_prod = SpatialWeighted(central_prod, **self.coords)
         num = weighted_prod.reduce("mean", **kwargs)
         den = self.reduce("std", **kwargs) * weighted_obj.reduce("std", **kwargs)
