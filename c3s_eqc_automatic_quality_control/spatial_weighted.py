@@ -4,7 +4,7 @@ from typing import Any, Callable, Hashable, TypeVar
 
 import numpy as np
 import xarray as xr
-from typing_extensions import ParamSpec
+from typing_extensions import ParamSpec, TypedDict
 from xarray.core.weighted import DataArrayWeighted, DatasetWeighted
 
 P = ParamSpec("P")
@@ -19,11 +19,17 @@ def keep_attrs(func: Callable[P, T]) -> Callable[P, T]:
     return wrapper
 
 
+SpatialWeightedKwargs = TypedDict(
+    "SpatialWeightedKwargs",
+    {"lon_name": Hashable, "lat_name": Hashable, "weights": xr.DataArray},
+)
+
+
 @dataclasses.dataclass
 class SpatialWeighted:
     obj: xr.DataArray | xr.Dataset
-    lon_name: str | None
-    lat_name: str | None
+    lon_name: Hashable | None
+    lat_name: Hashable | None
     weights: xr.DataArray | None
 
     def get_coord(self, coordinate: str) -> Hashable:
@@ -36,12 +42,12 @@ class SpatialWeighted:
         raise ValueError(f"Can not infer {coordinate!r}: {coords!r}")
 
     @functools.cached_property
-    def kwargs(self) -> dict[str, Any]:
-        return {
-            "lon_name": self.lon_name,
-            "lat_name": self.lat_name,
-            "weights": self.obj_weighted.weights,
-        }
+    def kwargs(self) -> SpatialWeightedKwargs:
+        return SpatialWeightedKwargs(
+            lon_name=self.lon.name,
+            lat_name=self.lat.name,
+            weights=self.obj_weighted.weights,
+        )
 
     @functools.cached_property
     def lon(self) -> xr.DataArray:

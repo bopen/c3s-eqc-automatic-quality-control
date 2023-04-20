@@ -17,7 +17,7 @@ This module gathers available diagnostics.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any
+from typing import Any, Hashable
 
 import cacholote
 import pyproj
@@ -145,8 +145,8 @@ def annual_weighted_mean_timeseries(
 
 def spatial_weighted_mean(
     obj: xr.Dataset | xr.DataArray,
-    lon_name: str | None = None,
-    lat_name: str | None = None,
+    lon_name: Hashable | None = None,
+    lat_name: Hashable | None = None,
     weights: xr.DataArray | None = None,
     **kwargs: Any,
 ) -> xr.Dataset | xr.DataArray:
@@ -171,8 +171,8 @@ def spatial_weighted_mean(
 
 def spatial_weighted_std(
     obj: xr.Dataset | xr.DataArray,
-    lon_name: str | None = None,
-    lat_name: str | None = None,
+    lon_name: Hashable | None = None,
+    lat_name: Hashable | None = None,
     weights: xr.DataArray | None = None,
     **kwargs: Any,
 ) -> xr.Dataset | xr.DataArray:
@@ -197,8 +197,8 @@ def spatial_weighted_std(
 
 def spatial_weighted_median(
     obj: xr.Dataset | xr.DataArray,
-    lon_name: str | None = None,
-    lat_name: str | None = None,
+    lon_name: Hashable | None = None,
+    lat_name: Hashable | None = None,
     weights: xr.DataArray | None = None,
     **kwargs: Any,
 ) -> xr.Dataset | xr.DataArray:
@@ -223,8 +223,8 @@ def spatial_weighted_median(
 
 def spatial_weighted_statistics(
     obj: xr.Dataset | xr.DataArray,
-    lon_name: str | None = None,
-    lat_name: str | None = None,
+    lon_name: Hashable | None = None,
+    lat_name: Hashable | None = None,
     weights: xr.DataArray | None = None,
     **kwargs: Any,
 ) -> xr.Dataset | xr.DataArray:
@@ -256,8 +256,8 @@ def spatial_weighted_statistics(
 def spatial_weighted_rmse(
     obj1: xr.Dataset | xr.DataArray,
     obj2: xr.Dataset | xr.DataArray,
-    lon_name: str | None = None,
-    lat_name: str | None = None,
+    lon_name: Hashable | None = None,
+    lat_name: Hashable | None = None,
     weights: xr.DataArray | None = None,
     **kwargs: Any,
 ) -> xr.Dataset | xr.DataArray:
@@ -283,8 +283,8 @@ def spatial_weighted_rmse(
 def spatial_weighted_crmse(
     obj1: xr.Dataset | xr.DataArray,
     obj2: xr.Dataset | xr.DataArray,
-    lon_name: str | None = None,
-    lat_name: str | None = None,
+    lon_name: Hashable | None = None,
+    lat_name: Hashable | None = None,
     weights: xr.DataArray | None = None,
     **kwargs: Any,
 ) -> xr.Dataset | xr.DataArray:
@@ -310,8 +310,8 @@ def spatial_weighted_crmse(
 def spatial_weighted_corr(
     obj1: xr.Dataset | xr.DataArray,
     obj2: xr.Dataset | xr.DataArray,
-    lon_name: str | None = None,
-    lat_name: str | None = None,
+    lon_name: Hashable | None = None,
+    lat_name: Hashable | None = None,
     weights: xr.DataArray | None = None,
     **kwargs: Any,
 ) -> xr.Dataset | xr.DataArray:
@@ -337,8 +337,8 @@ def spatial_weighted_corr(
 def spatial_weighted_errors(
     obj1: xr.Dataset | xr.DataArray,
     obj2: xr.Dataset | xr.DataArray,
-    lon_name: str | None = None,
-    lat_name: str | None = None,
+    lon_name: Hashable | None = None,
+    lat_name: Hashable | None = None,
     weights: xr.DataArray | None = None,
     **kwargs: Any,
 ) -> xr.Dataset | xr.DataArray:
