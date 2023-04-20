@@ -350,8 +350,6 @@ def _preprocess(
     collection_id: str,
     preprocess: Callable[[xr.Dataset], xr.Dataset] | None = None,
 ) -> xr.Dataset:
-    source = ds.encoding.get("source")
-
     if preprocess is not None:
         ds = preprocess(ds)
 
@@ -364,13 +362,10 @@ def _preprocess(
             ds = ds.cf.expand_dims("forecast_reference_time")
         elif "time" in ds:
             ds = ds.expand_dims("time")
-        elif collection_id.startswith("satellite-") and source:
-            ds = ds.expand_dims(source=[pathlib.Path(source).stem])
+        elif collection_id.startswith("satellite-") and "source" in ds.encoding:
+            ds = ds.expand_dims(source=[pathlib.Path(ds.encoding["source"]).stem])
 
     ds = _add_bounds(ds)
-
-    if source:
-        ds.encoding["source"] = source
     return ds
 
 
@@ -391,47 +386,51 @@ def _download_and_transform_requests(
     transform_func_kwargs: dict[str, Any],
     **open_mfdataset_kwargs: Any,
 ) -> xr.Dataset:
-    # TODO: Ideally, we would always use emohawk.
-    # However, there is not a consistent behavior across backends.
-    # For example, GRIB silently ignore open_mfdataset_kwargs
-    sources = get_sources(collection_id, request_list)
-    try:
-        engine = open_mfdataset_kwargs.get(
-            "engine", {xr.backends.plugins.guess_engine(source) for source in sources}
-        )
-        use_emohawk = len(engine) != 1
-    except ValueError:
-        use_emohawk = True
-
-    open_mfdataset_kwargs["preprocess"] = functools.partial(
-        _preprocess,
-        collection_id=collection_id,
-        preprocess=open_mfdataset_kwargs.get("preprocess", None),
-    )
-
-    if use_emohawk:
-        data = get_data(sources)
-        ds: xr.Dataset = data.to_xarray(
-            xarray_open_mfdataset_kwargs=open_mfdataset_kwargs,
-            **TO_XARRAY_KWARGS,
-        )
-        if not isinstance(ds, xr.Dataset):
-            # When emohawk fails to concat, it silently return a list
-            raise TypeError(f"`emohawk` returned {type(ds)} instead of a xr.Dataset")
-    else:
-        ds = xr.open_mfdataset(sources, **open_mfdataset_kwargs)
-
-    if transform_func is not None:
-        ds = transform_func(ds, **transform_func_kwargs)
-        if not isinstance(ds, xr.Dataset):
-            raise TypeError(
-                f"`transform_func` must return a xr.Dataset, while it returned {type(ds)}"
+    with cacholote.config.set(return_cache_entry=False):
+        # TODO: Ideally, we would always use emohawk.
+        # However, there is not a consistent behavior across backends.
+        # For example, GRIB silently ignore open_mfdataset_kwargs
+        sources = get_sources(collection_id, request_list)
+        try:
+            engine = open_mfdataset_kwargs.get(
+                "engine",
+                {xr.backends.plugins.guess_engine(source) for source in sources},
             )
+            use_emohawk = len(engine) != 1
+        except ValueError:
+            use_emohawk = True
 
-    # TODO: make cacholote add coordinates? Needed to guarantee roundtrip
-    # See: https://docs.xarray.dev/en/stable/user-guide/io.html#coordinates
-    ds.attrs["coordinates"] = " ".join([str(coord) for coord in ds.coords])
-    return ds
+        open_mfdataset_kwargs["preprocess"] = functools.partial(
+            _preprocess,
+            collection_id=collection_id,
+            preprocess=open_mfdataset_kwargs.get("preprocess", None),
+        )
+
+        if use_emohawk:
+            data = get_data(sources)
+            ds: xr.Dataset = data.to_xarray(
+                xarray_open_mfdataset_kwargs=open_mfdataset_kwargs,
+                **TO_XARRAY_KWARGS,
+            )
+            if not isinstance(ds, xr.Dataset):
+                # When emohawk fails to concat, it silently return a list
+                raise TypeError(
+                    f"`emohawk` returned {type(ds)} instead of a xr.Dataset"
+                )
+        else:
+            ds = xr.open_mfdataset(sources, **open_mfdataset_kwargs)
+
+        if transform_func is not None:
+            ds = transform_func(ds, **transform_func_kwargs)
+            if not isinstance(ds, xr.Dataset):
+                raise TypeError(
+                    f"`transform_func` must return a xr.Dataset, while it returned {type(ds)}"
+                )
+
+        # TODO: make cacholote add coordinates? Needed to guarantee roundtrip
+        # See: https://docs.xarray.dev/en/stable/user-guide/io.html#coordinates
+        ds.attrs["coordinates"] = " ".join([str(coord) for coord in ds.coords])
+        return ds
 
 
 def download_and_transform(
@@ -501,14 +500,15 @@ def download_and_transform(
         # Cache each chunk separately
         sources = []
         for request in tqdm.tqdm(request_list):
-            ds = download_and_transform_requests(
-                collection_id,
-                [request],
-                transform_func,
-                transform_func_kwargs,
-                **open_mfdataset_kwargs,
-            )
-            sources.append(ds.encoding["source"])
+            with cacholote.config.set(return_cache_entry=True):
+                cache_entry = download_and_transform_requests(
+                    collection_id,
+                    [request],
+                    transform_func,
+                    transform_func_kwargs,
+                    **open_mfdataset_kwargs,
+                )
+            sources.append(cache_entry.result["args"][0]["href"])
         open_mfdataset_kwargs.pop("preprocess", None)  # Already preprocessed
         ds = xr.open_mfdataset(sources, **open_mfdataset_kwargs)
 
