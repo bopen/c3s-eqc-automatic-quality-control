@@ -147,6 +147,7 @@ def spatial_weighted_mean(
     obj: xr.Dataset | xr.DataArray,
     lon_name: str | None = None,
     lat_name: str | None = None,
+    weights: xr.DataArray | None = None,
     **kwargs: Any,
 ) -> xr.Dataset | xr.DataArray:
     """
@@ -163,7 +164,7 @@ def spatial_weighted_mean(
     -------
     reduced object
     """
-    return spatial_weighted.SpatialWeighted(obj, lon_name, lat_name).reduce(
+    return spatial_weighted.SpatialWeighted(obj, lon_name, lat_name, weights).reduce(
         "mean", **kwargs
     )
 
@@ -172,6 +173,7 @@ def spatial_weighted_std(
     obj: xr.Dataset | xr.DataArray,
     lon_name: str | None = None,
     lat_name: str | None = None,
+    weights: xr.DataArray | None = None,
     **kwargs: Any,
 ) -> xr.Dataset | xr.DataArray:
     """
@@ -188,7 +190,7 @@ def spatial_weighted_std(
     -------
     reduced object
     """
-    return spatial_weighted.SpatialWeighted(obj, lon_name, lat_name).reduce(
+    return spatial_weighted.SpatialWeighted(obj, lon_name, lat_name, weights).reduce(
         "std", **kwargs
     )
 
@@ -197,6 +199,7 @@ def spatial_weighted_median(
     obj: xr.Dataset | xr.DataArray,
     lon_name: str | None = None,
     lat_name: str | None = None,
+    weights: xr.DataArray | None = None,
     **kwargs: Any,
 ) -> xr.Dataset | xr.DataArray:
     """
@@ -213,7 +216,7 @@ def spatial_weighted_median(
     -------
     reduced object
     """
-    return spatial_weighted.SpatialWeighted(obj, lon_name, lat_name).reduce(
+    return spatial_weighted.SpatialWeighted(obj, lon_name, lat_name, weights).reduce(
         "quantile", q=0.5, **kwargs
     )
 
@@ -222,6 +225,7 @@ def spatial_weighted_statistics(
     obj: xr.Dataset | xr.DataArray,
     lon_name: str | None = None,
     lat_name: str | None = None,
+    weights: xr.DataArray | None = None,
     **kwargs: Any,
 ) -> xr.Dataset | xr.DataArray:
     """
@@ -238,7 +242,7 @@ def spatial_weighted_statistics(
     -------
     reduced object
     """
-    sw = spatial_weighted.SpatialWeighted(obj, lon_name, lat_name)
+    sw = spatial_weighted.SpatialWeighted(obj, lon_name, lat_name, weights)
     objects = []
     for func in ("mean", "std", "median"):
         if func == "median":
@@ -254,6 +258,7 @@ def spatial_weighted_rmse(
     obj2: xr.Dataset | xr.DataArray,
     lon_name: str | None = None,
     lat_name: str | None = None,
+    weights: xr.DataArray | None = None,
     **kwargs: Any,
 ) -> xr.Dataset | xr.DataArray:
     """
@@ -270,7 +275,7 @@ def spatial_weighted_rmse(
     -------
     reduced object
     """
-    return spatial_weighted.SpatialWeighted(obj1, lon_name, lat_name).rmse(
+    return spatial_weighted.SpatialWeighted(obj1, lon_name, lat_name, weights).rmse(
         obj2, centralise=False, **kwargs
     )
 
@@ -280,6 +285,7 @@ def spatial_weighted_crmse(
     obj2: xr.Dataset | xr.DataArray,
     lon_name: str | None = None,
     lat_name: str | None = None,
+    weights: xr.DataArray | None = None,
     **kwargs: Any,
 ) -> xr.Dataset | xr.DataArray:
     """
@@ -296,7 +302,7 @@ def spatial_weighted_crmse(
     -------
     reduced object
     """
-    return spatial_weighted.SpatialWeighted(obj1, lon_name, lat_name).rmse(
+    return spatial_weighted.SpatialWeighted(obj1, lon_name, lat_name, weights).rmse(
         obj2, centralise=True, **kwargs
     )
 
@@ -306,6 +312,7 @@ def spatial_weighted_corr(
     obj2: xr.Dataset | xr.DataArray,
     lon_name: str | None = None,
     lat_name: str | None = None,
+    weights: xr.DataArray | None = None,
     **kwargs: Any,
 ) -> xr.Dataset | xr.DataArray:
     """
@@ -322,7 +329,7 @@ def spatial_weighted_corr(
     -------
     reduced object
     """
-    return spatial_weighted.SpatialWeighted(obj1, lon_name, lat_name).corr(
+    return spatial_weighted.SpatialWeighted(obj1, lon_name, lat_name, weights).corr(
         obj2, **kwargs
     )
 
@@ -332,6 +339,7 @@ def spatial_weighted_errors(
     obj2: xr.Dataset | xr.DataArray,
     lon_name: str | None = None,
     lat_name: str | None = None,
+    weights: xr.DataArray | None = None,
     **kwargs: Any,
 ) -> xr.Dataset | xr.DataArray:
     """
@@ -348,7 +356,7 @@ def spatial_weighted_errors(
     -------
     reduced object
     """
-    sw = spatial_weighted.SpatialWeighted(obj1, lon_name, lat_name)
+    sw = spatial_weighted.SpatialWeighted(obj1, lon_name, lat_name, weights)
     objects = []
     for func in ("rmse", "crmse", "corr"):
         if func.endswith("rmse"):

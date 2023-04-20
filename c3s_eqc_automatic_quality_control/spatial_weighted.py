@@ -24,6 +24,7 @@ class SpatialWeighted:
     obj: xr.DataArray | xr.Dataset
     lon_name: str | None
     lat_name: str | None
+    weights: xr.DataArray | None
 
     def get_coord(self, coordinate: str) -> Hashable:
         coords: list[Hashable] = self.obj.cf.coordinates[coordinate]
@@ -35,8 +36,12 @@ class SpatialWeighted:
         raise ValueError(f"Can not infer {coordinate!r}: {coords!r}")
 
     @functools.cached_property
-    def coords(self) -> dict[str, str | None]:
-        return {"lon_name": self.lon_name, "lat_name": self.lat_name}
+    def kwargs(self) -> dict[str, Any]:
+        return {
+            "lon_name": self.lon_name,
+            "lat_name": self.lat_name,
+            "weights": self.obj_weighted.weights,
+        }
 
     @functools.cached_property
     def lon(self) -> xr.DataArray:
@@ -53,7 +58,9 @@ class SpatialWeighted:
 
     @functools.cached_property
     def obj_weighted(self) -> DataArrayWeighted | DatasetWeighted:
-        weights = np.cos(np.deg2rad(self.lat))
+        weights: xr.DataArray = (
+            self.weights if self.weights is not None else np.cos(np.deg2rad(self.lat))
+        )
         return self.obj.weighted(weights)
 
     @keep_attrs
@@ -72,20 +79,19 @@ class SpatialWeighted:
         self, obj: xr.DataArray | xr.Dataset, centralise: bool = False, **kwargs: Any
     ) -> xr.DataArray | xr.Dataset:
         if centralise:
-            weighted_obj = SpatialWeighted(obj, **self.coords)
+            weighted_obj = SpatialWeighted(obj, **self.kwargs)
             diff = weighted_obj.centralise(**kwargs) - self.centralise(**kwargs)
         else:
             diff = obj - self.obj
-        weighted_diff2 = SpatialWeighted(diff**2, **self.coords)
+        weighted_diff2 = SpatialWeighted(diff**2, **self.kwargs)
         return weighted_diff2.reduce("mean", **kwargs) ** 0.5
 
     @keep_attrs
     def corr(
         self, obj: xr.DataArray | xr.Dataset, **kwargs: Any
     ) -> xr.DataArray | xr.Dataset:
-        weighted_obj = SpatialWeighted(obj, **self.coords)
+        weighted_obj = SpatialWeighted(obj, **self.kwargs)
         central_prod = self.centralise(**kwargs) * weighted_obj.centralise(**kwargs)
-        weighted_prod = SpatialWeighted(central_prod, **self.coords)
-        num = weighted_prod.reduce("mean", **kwargs)
+        num = SpatialWeighted(central_prod, **self.kwargs).reduce("mean", **kwargs)
         den = self.reduce("std", **kwargs) * weighted_obj.reduce("std", **kwargs)
         return num / den
