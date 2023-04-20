@@ -250,7 +250,8 @@ def spatial_weighted_statistics(
         else:
             obj = sw.reduce(func, **kwargs)
         objects.append(obj.expand_dims(diagnostics=[func]))
-    return xr.concat(objects, "diagnostics")
+    ds = xr.merge(objects)
+    return ds[obj.name] if isinstance(obj, xr.DataArray) else ds
 
 
 def spatial_weighted_rmse(
@@ -365,7 +366,8 @@ def spatial_weighted_errors(
         else:
             obj = getattr(sw, func)(obj2, **kwargs)
         objects.append(obj.expand_dims(diagnostics=[func]))
-    return xr.concat(objects, "diagnostics")
+    ds = xr.merge(objects)
+    return ds[obj1.name] if isinstance(obj1, xr.DataArray) else ds
 
 
 def _poly_area(lon_bounds, lat_bounds, geod):  # type: ignore  # TODO: add typing

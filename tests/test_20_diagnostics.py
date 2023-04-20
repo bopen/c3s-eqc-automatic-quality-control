@@ -30,11 +30,11 @@ def test_spatial_weighted_statistics(obj: xr.DataArray | xr.Dataset) -> None:
     actual_median = diagnostics.spatial_weighted_median(obj)
     xr.testing.assert_equal(actual_median, expected_median)
 
-    expected_statistics = xr.concat(
+    expected_statistics = xr.concat(  # type: ignore[type-var]  # TODO: use overload to fix this
         [
             expected_mean.expand_dims(diagnostics=["mean"]),
-            expected_std.expand_dims(diagnostics=["std"]),
             expected_median.expand_dims(diagnostics=["median"]),
+            expected_std.expand_dims(diagnostics=["std"]),
         ],
         "diagnostics",
     )
@@ -69,7 +69,6 @@ def test_spatial_weighted_errors(obj: xr.DataArray | xr.Dataset) -> None:
     expected_crmse = (((obj2 - mean2) - (obj1 - mean1)) ** 2).weighted(weights).mean(
         dim=("latitude", "longitude")
     ) ** 0.5
-
     actual_crmse = diagnostics.spatial_weighted_crmse(obj1, obj2)
     xr.testing.assert_equal(expected_crmse, actual_crmse)
 
@@ -79,11 +78,11 @@ def test_spatial_weighted_errors(obj: xr.DataArray | xr.Dataset) -> None:
     actual_corr = diagnostics.spatial_weighted_corr(obj1, obj2)
     xr.testing.assert_equal(expected_corr, actual_corr)
 
-    expected_errors = xr.concat(
+    expected_errors = xr.concat(  # type: ignore[type-var]  # TODO: use overload to fix this
         [
-            expected_rmse.expand_dims(diagnostics=["rmse"]),
-            expected_crmse.expand_dims(diagnostics=["crmse"]),
             expected_corr.expand_dims(diagnostics=["corr"]),
+            expected_crmse.expand_dims(diagnostics=["crmse"]),
+            expected_rmse.expand_dims(diagnostics=["rmse"]),
         ],
         "diagnostics",
     )
