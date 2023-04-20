@@ -30,14 +30,14 @@ def test_spatial_weighted_statistics(obj: xr.DataArray | xr.Dataset) -> None:
     actual_median = diagnostics.spatial_weighted_median(obj)
     xr.testing.assert_equal(actual_median, expected_median)
 
-    expected_statistics = xr.concat(  # type: ignore[type-var]  # TODO: use overload to fix this
+    ds = xr.merge(
         [
             expected_mean.expand_dims(diagnostics=["mean"]),
             expected_median.expand_dims(diagnostics=["median"]),
             expected_std.expand_dims(diagnostics=["std"]),
         ],
-        "diagnostics",
     )
+    expected_statistics = ds if isinstance(obj, xr.Dataset) else ds["t2m"]
     actual_statistics = diagnostics.spatial_weighted_statistics(obj)
     xr.testing.assert_equal(expected_statistics, actual_statistics)
 
@@ -78,14 +78,14 @@ def test_spatial_weighted_errors(obj: xr.DataArray | xr.Dataset) -> None:
     actual_corr = diagnostics.spatial_weighted_corr(obj1, obj2)
     xr.testing.assert_equal(expected_corr, actual_corr)
 
-    expected_errors = xr.concat(  # type: ignore[type-var]  # TODO: use overload to fix this
+    ds = xr.merge(
         [
             expected_corr.expand_dims(diagnostics=["corr"]),
             expected_crmse.expand_dims(diagnostics=["crmse"]),
             expected_rmse.expand_dims(diagnostics=["rmse"]),
         ],
-        "diagnostics",
     )
+    expected_errors = ds if isinstance(obj, xr.Dataset) else ds["t2m"]
     actual_errors = diagnostics.spatial_weighted_errors(obj1, obj2)
     xr.testing.assert_equal(expected_errors, actual_errors)
 
