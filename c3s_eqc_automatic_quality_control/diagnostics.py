@@ -399,7 +399,7 @@ def grid_cell_area(
 
     Parameters
     ----------
-    obj: Dataset or DataArray
+    obj: DataArray or Dataset
         Input object with coordinates
     geod: pyproj.Geod
         Projection (default is WGS84)
@@ -409,15 +409,10 @@ def grid_cell_area(
     DataArray
         Grid cell area
     """
-    if isinstance(obj, xr.DataArray):
-        obj = obj.to_dataset(name=obj.name or "None")
-
-    for coord in ("longitude", "latitude"):
-        if coord not in obj.cf.bounds:
-            obj = obj.cf.add_bounds(coord)
-
+    ds = obj if isinstance(obj, xr.Dataset) else obj.to_dataset(name=obj.name or "None")
+    ds = ds.cf.add_bounds({"longitude", "latitude"} - set(ds.cf.bounds))
     return _grid_cell_area.cached_grid_cell_area(
-        obj.cf.get_bounds("longitude").to_dict(),
-        obj.cf.get_bounds("latitude").to_dict(),
+        ds.cf.get_bounds("longitude").to_dict(),
+        ds.cf.get_bounds("latitude").to_dict(),
         geod,
     )["cell_area"]
