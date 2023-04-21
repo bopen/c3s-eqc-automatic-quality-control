@@ -1,15 +1,11 @@
 import dataclasses
 import functools
-from typing import Any, Hashable, TypeVar, overload
+from typing import Any, Hashable, overload
 
 import xarray as xr
-from typing_extensions import ParamSpec
 from xarray.core.weighted import DataArrayWeighted, DatasetWeighted
 
 from . import utils
-
-P = ParamSpec("P")
-T = TypeVar("T")
 
 
 @dataclasses.dataclass
