@@ -32,9 +32,9 @@ def test_spatial_weighted_statistics(obj: xr.DataArray | xr.Dataset) -> None:
 
     ds = xr.merge(
         [
-            expected_mean.expand_dims(diagnostics=["mean"]),
-            expected_median.expand_dims(diagnostics=["median"]),
-            expected_std.expand_dims(diagnostics=["std"]),
+            expected_mean.expand_dims(diagnostic=["mean"]),
+            expected_median.expand_dims(diagnostic=["median"]),
+            expected_std.expand_dims(diagnostic=["std"]),
         ],
     )
     expected_statistics = ds if isinstance(obj, xr.Dataset) else ds["t2m"]
@@ -80,9 +80,9 @@ def test_spatial_weighted_errors(obj: xr.DataArray | xr.Dataset) -> None:
 
     ds = xr.merge(
         [
-            expected_corr.expand_dims(diagnostics=["corr"]),
-            expected_crmse.expand_dims(diagnostics=["crmse"]),
-            expected_rmse.expand_dims(diagnostics=["rmse"]),
+            expected_corr.expand_dims(diagnostic=["corr"]),
+            expected_crmse.expand_dims(diagnostic=["crmse"]),
+            expected_rmse.expand_dims(diagnostic=["rmse"]),
         ],
     )
     expected_errors = ds if isinstance(obj, xr.Dataset) else ds["t2m"]
@@ -102,6 +102,55 @@ def test_spatial_weighted_rmse_against_sklearn() -> None:
     )
     actual = diagnostics.spatial_weighted_rmse(da1, da2)
     assert expected == actual.values
+
+
+@pytest.mark.parametrize(
+    "obj",
+    [
+        xr.tutorial.open_dataset("rasm"),
+        xr.tutorial.open_dataset("rasm")["Tair"],
+    ],
+)
+def test_time_weighted_mean(obj: xr.DataArray | xr.Dataset) -> None:
+    weights = obj["time"].dt.days_in_month
+    expected = (obj * weights).sum("time") / weights.sum("time")
+    actual = diagnostics.time_weighted_mean(obj)
+    xr.testing.assert_equal(expected, actual.fillna(0))
+
+
+@pytest.mark.parametrize(
+    "obj",
+    [
+        xr.tutorial.open_dataset("rasm"),
+        xr.tutorial.open_dataset("rasm")["Tair"],
+    ],
+)
+def test_seasonal_weighted_mean(obj: xr.DataArray | xr.Dataset) -> None:
+    days_in_month = obj["time"].dt.days_in_month
+    weights = (
+        days_in_month.groupby("time.season")
+        / days_in_month.groupby("time.season").sum()
+    )
+    expected = (obj * weights).groupby("time.season").sum(dim="time")
+    actual = diagnostics.seasonal_weighted_mean(obj)
+    xr.testing.assert_allclose(expected, actual.fillna(0))
+
+
+@pytest.mark.parametrize(
+    "obj",
+    [
+        xr.tutorial.open_dataset("rasm"),
+        xr.tutorial.open_dataset("rasm")["Tair"],
+    ],
+)
+def test_annual_weighted_mean(obj: xr.DataArray | xr.Dataset) -> None:
+    days_in_month = obj["time"].dt.days_in_month
+    weights = (
+        days_in_month.groupby("time.year") / days_in_month.groupby("time.year").sum()
+    )
+    expected = (obj * weights).groupby("time.year").sum(dim="time")
+    actual = diagnostics.annual_weighted_mean(obj)
+    xr.testing.assert_allclose(expected, actual.fillna(0))
 
 
 def test_grid_cell_area() -> None:

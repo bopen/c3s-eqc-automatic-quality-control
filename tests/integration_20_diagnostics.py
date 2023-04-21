@@ -38,14 +38,21 @@ def test_weighted_diagnostics() -> None:
         "diagnostic": 3,
     }
 
+    assert dict(diagnostics.time_weighted_mean(ds_era5).sizes) == {
+        "longitude": 1440,
+        "latitude": 721,
+    }
+
     assert dict(diagnostics.seasonal_weighted_mean(ds_era5).sizes) == {
         "longitude": 1440,
         "latitude": 721,
         "season": 1,
     }
+
     assert dict(diagnostics.annual_weighted_mean(ds_era5).sizes) == {
         "longitude": 1440,
         "latitude": 721,
+        "year": 1,
     }
 
 

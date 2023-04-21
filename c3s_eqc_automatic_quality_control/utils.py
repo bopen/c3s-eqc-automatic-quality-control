@@ -13,7 +13,21 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Callable, TypeVar
+
 import xarray as xr
+from typing_extensions import ParamSpec
+
+P = ParamSpec("P")
+T = TypeVar("T")
+
+
+def keep_attrs(func: Callable[P, T]) -> Callable[P, T]:
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
+        with xr.set_options(keep_attrs=True):  # type: ignore[no-untyped-call]
+            return func(*args, **kwargs)
+
+    return wrapper
 
 
 def _get_time(obj: xr.Dataset | xr.DataArray, time: str | None) -> str:

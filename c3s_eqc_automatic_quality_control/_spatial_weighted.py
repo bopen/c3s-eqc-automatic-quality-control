@@ -1,23 +1,13 @@
 import dataclasses
 import functools
-from typing import Any, Callable, Hashable, TypeVar
+from typing import Any, Hashable
 
 import numpy as np
 import xarray as xr
-from typing_extensions import ParamSpec, TypedDict
+from typing_extensions import TypedDict
 from xarray.core.weighted import DataArrayWeighted, DatasetWeighted
 
-P = ParamSpec("P")
-T = TypeVar("T")
-
-
-def keep_attrs(func: Callable[P, T]) -> Callable[P, T]:
-    def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
-        with xr.set_options(keep_attrs=True):  # type: ignore[no-untyped-call]
-            return func(*args, **kwargs)
-
-    return wrapper
-
+from . import utils
 
 SpatialWeightedKwargs = TypedDict(
     "SpatialWeightedKwargs",
@@ -32,14 +22,14 @@ class SpatialWeighted:
     lat_name: Hashable | None
     weights: xr.DataArray | None
 
-    def get_coord(self, coordinate: str) -> Hashable:
+    def get_coord_name(self, coordinate: str) -> Hashable:
         coords: list[Hashable] = self.obj.cf.coordinates[coordinate]
         if isinstance(self.obj, xr.Dataset):
             bounds = self.obj.cf.bounds.get(coordinate, [])
             coords = list(set(coords) - set(bounds))
         if len(coords) == 1:
             return coords[0]
-        raise ValueError(f"Can not infer {coordinate!r}: {coords!r}")
+        raise ValueError(f"Can NOT infer {coordinate!r}: {coords!r}")
 
     @functools.cached_property
     def kwargs(self) -> SpatialWeightedKwargs:
@@ -51,11 +41,23 @@ class SpatialWeighted:
 
     @functools.cached_property
     def lon(self) -> xr.DataArray:
-        return xr.DataArray(self.obj[self.lon_name or self.get_coord("longitude")])
+        return xr.DataArray(
+            self.obj[
+                self.lon_name
+                if self.lon_name is not None
+                else self.get_coord_name("longitude")
+            ]
+        )
 
     @functools.cached_property
     def lat(self) -> xr.DataArray:
-        return xr.DataArray(self.obj[self.lat_name or self.get_coord("latitude")])
+        return xr.DataArray(
+            self.obj[
+                self.lat_name
+                if self.lat_name is not None
+                else self.get_coord_name("latitude")
+            ]
+        )
 
     @functools.cached_property
     def reduction_dims(self) -> list[str]:
@@ -69,18 +71,18 @@ class SpatialWeighted:
         )
         return self.obj.weighted(weights)
 
-    @keep_attrs
-    def reduce(self, func: str, **kwargs: Any) -> xr.DataArray | xr.Dataset:
+    @utils.keep_attrs
+    def reduce(self, func_name: str, **kwargs: Any) -> xr.DataArray | xr.Dataset:
         if "dim" not in kwargs:
             kwargs["dim"] = self.reduction_dims
-        obj: xr.DataArray | xr.Dataset = getattr(self.obj_weighted, func)(**kwargs)
+        obj: xr.DataArray | xr.Dataset = getattr(self.obj_weighted, func_name)(**kwargs)
         return obj
 
-    @keep_attrs
+    @utils.keep_attrs
     def centralise(self, **kwargs: Any) -> xr.DataArray | xr.Dataset:
         return self.obj - self.reduce("mean", **kwargs)
 
-    @keep_attrs
+    @utils.keep_attrs
     def rmse(
         self, obj: xr.DataArray | xr.Dataset, centralise: bool = False, **kwargs: Any
     ) -> xr.DataArray | xr.Dataset:
@@ -92,7 +94,7 @@ class SpatialWeighted:
         weighted_diff2 = SpatialWeighted(diff**2, **self.kwargs)
         return weighted_diff2.reduce("mean", **kwargs) ** 0.5
 
-    @keep_attrs
+    @utils.keep_attrs
     def corr(
         self, obj: xr.DataArray | xr.Dataset, **kwargs: Any
     ) -> xr.DataArray | xr.Dataset:

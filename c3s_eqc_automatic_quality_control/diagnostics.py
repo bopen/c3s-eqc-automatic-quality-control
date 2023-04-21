@@ -25,7 +25,7 @@ import shapely
 import xarray as xr
 import xesmf as xe
 
-from . import spatial_weighted, utils
+from . import _spatial_weighted, _time_weighted
 
 
 @cacholote.cacheable
@@ -66,81 +66,79 @@ def regrid(
     return obj
 
 
-def seasonal_weighted_mean(obj: xr.Dataset, time: str | None = None) -> xr.Dataset:
+def time_weighted_mean(
+    obj: xr.DataArray | xr.Dataset,
+    time_name: Hashable | None = None,
+    weights: xr.DataArray | None = None,
+    **kwargs: Any,
+) -> xr.DataArray | xr.Dataset:
+    """
+    Calculate time weighted mean.
+
+    Parameters
+    ----------
+    obj: xr.Dataset or xr.DataArray
+        Input data
+    time: hashable, optional
+        Name of time coordinate
+
+    Returns
+    -------
+    reduced object
+    """
+    return _time_weighted.TimeWeighted(obj, time_name, weights).reduce(
+        "mean", None, **kwargs
+    )
+
+
+def seasonal_weighted_mean(
+    obj: xr.DataArray | xr.Dataset,
+    time_name: Hashable | None = None,
+    weights: xr.DataArray | None = None,
+    **kwargs: Any,
+) -> xr.DataArray | xr.Dataset:
     """
     Calculate seasonal weighted mean.
 
     Parameters
     ----------
-    obj: xr.Dataset
+    obj: xr.Dataset or xr.DataArray
         Input data
-    time: str, optional
+    time: hashable, optional
         Name of time coordinate
 
     Returns
     -------
     reduced object
     """
-    time = utils._get_time(obj, time)
-
-    with xr.set_options(keep_attrs=True):  # type: ignore[no-untyped-call]
-        obj = obj.convert_calendar("noleap", align_on="date", dim=time)
-        month_length = obj[time].dt.days_in_month
-        weights = (
-            month_length.groupby(f"{time}.season")
-            / month_length.groupby(f"{time}.season").sum()
-        )
-        obj = (obj * weights).groupby(f"{time}.season").sum(dim=time)
-    return obj
+    return _time_weighted.TimeWeighted(obj, time_name, weights).reduce(
+        "mean", "season", **kwargs
+    )
 
 
-def annual_weighted_mean(obj: xr.Dataset, time: str | None = None) -> xr.Dataset:
+def annual_weighted_mean(
+    obj: xr.DataArray | xr.Dataset,
+    time_name: Hashable | None = None,
+    weights: xr.DataArray | None = None,
+    **kwargs: Any,
+) -> xr.DataArray | xr.Dataset:
     """
     Calculate annual weighted mean.
 
     Parameters
     ----------
-    obj: xr.Dataset
+    obj: xr.Dataset or xr.DataArray
         Input data
-    time: str, optional
+    time: hashable, optional
         Name of time coordinate
 
     Returns
     -------
     reduced object
     """
-    time = utils._get_time(obj, time)
-
-    season_obj = seasonal_weighted_mean(obj, time)
-    with xr.set_options(keep_attrs=True):  # type: ignore[no-untyped-call]
-        obj = obj.convert_calendar("noleap", align_on="date", dim=time)
-        month_length = obj[time].dt.days_in_month
-        weights = month_length.groupby(f"{time}.season").sum() / (
-            month_length.groupby(f"{time}.season").sum().sum()
-        )
-        obj = (season_obj * weights).sum(dim="season") / weights.sum("season")
-    return obj
-
-
-def annual_weighted_mean_timeseries(
-    obj: xr.Dataset, time: str | None = None
-) -> xr.Dataset:
-    """
-    Calculate annual weighted mean timeseries.
-
-    Parameters
-    ----------
-    obj: xr.Dataset
-        Input data
-    time: str, optional
-        Name of time coordinate
-
-    Returns
-    -------
-    reduced object
-    """
-    time = utils._get_time(obj, time)
-    return obj.groupby(f"{time}.year").map(annual_weighted_mean)
+    return _time_weighted.TimeWeighted(obj, time_name, weights).reduce(
+        "mean", "year", **kwargs
+    )
 
 
 def spatial_weighted_mean(
@@ -164,7 +162,7 @@ def spatial_weighted_mean(
     -------
     reduced object
     """
-    return spatial_weighted.SpatialWeighted(obj, lon_name, lat_name, weights).reduce(
+    return _spatial_weighted.SpatialWeighted(obj, lon_name, lat_name, weights).reduce(
         "mean", **kwargs
     )
 
@@ -190,7 +188,7 @@ def spatial_weighted_std(
     -------
     reduced object
     """
-    return spatial_weighted.SpatialWeighted(obj, lon_name, lat_name, weights).reduce(
+    return _spatial_weighted.SpatialWeighted(obj, lon_name, lat_name, weights).reduce(
         "std", **kwargs
     )
 
@@ -216,7 +214,7 @@ def spatial_weighted_median(
     -------
     reduced object
     """
-    return spatial_weighted.SpatialWeighted(obj, lon_name, lat_name, weights).reduce(
+    return _spatial_weighted.SpatialWeighted(obj, lon_name, lat_name, weights).reduce(
         "quantile", q=0.5, **kwargs
     )
 
@@ -242,14 +240,14 @@ def spatial_weighted_statistics(
     -------
     reduced object
     """
-    sw = spatial_weighted.SpatialWeighted(obj, lon_name, lat_name, weights)
+    sw = _spatial_weighted.SpatialWeighted(obj, lon_name, lat_name, weights)
     objects = []
     for func in ("mean", "std", "median"):
         if func == "median":
             obj = sw.reduce("quantile", q=0.5, **kwargs)
         else:
             obj = sw.reduce(func, **kwargs)
-        objects.append(obj.expand_dims(diagnostics=[func]))
+        objects.append(obj.expand_dims(diagnostic=[func]))
     ds = xr.merge(objects)
     return ds[obj.name] if isinstance(obj, xr.DataArray) else ds
 
@@ -276,7 +274,7 @@ def spatial_weighted_rmse(
     -------
     reduced object
     """
-    return spatial_weighted.SpatialWeighted(obj1, lon_name, lat_name, weights).rmse(
+    return _spatial_weighted.SpatialWeighted(obj1, lon_name, lat_name, weights).rmse(
         obj2, centralise=False, **kwargs
     )
 
@@ -303,7 +301,7 @@ def spatial_weighted_crmse(
     -------
     reduced object
     """
-    return spatial_weighted.SpatialWeighted(obj1, lon_name, lat_name, weights).rmse(
+    return _spatial_weighted.SpatialWeighted(obj1, lon_name, lat_name, weights).rmse(
         obj2, centralise=True, **kwargs
     )
 
@@ -330,7 +328,7 @@ def spatial_weighted_corr(
     -------
     reduced object
     """
-    return spatial_weighted.SpatialWeighted(obj1, lon_name, lat_name, weights).corr(
+    return _spatial_weighted.SpatialWeighted(obj1, lon_name, lat_name, weights).corr(
         obj2, **kwargs
     )
 
@@ -357,7 +355,7 @@ def spatial_weighted_errors(
     -------
     reduced object
     """
-    sw = spatial_weighted.SpatialWeighted(obj1, lon_name, lat_name, weights)
+    sw = _spatial_weighted.SpatialWeighted(obj1, lon_name, lat_name, weights)
     objects = []
     for func in ("rmse", "crmse", "corr"):
         if func.endswith("rmse"):
@@ -365,7 +363,7 @@ def spatial_weighted_errors(
             obj = sw.rmse(obj2, centralise=centralise, **kwargs)
         else:
             obj = getattr(sw, func)(obj2, **kwargs)
-        objects.append(obj.expand_dims(diagnostics=[func]))
+        objects.append(obj.expand_dims(diagnostic=[func]))
     ds = xr.merge(objects)
     return ds[obj1.name] if isinstance(obj1, xr.DataArray) else ds
 
