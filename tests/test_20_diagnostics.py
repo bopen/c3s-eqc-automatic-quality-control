@@ -187,7 +187,7 @@ def test_grid_cell_area() -> None:
     ds = xr.Dataset(
         {
             "longitude": xr.DataArray(np.arange(-180, 180, 10), dims="longitude"),
-            "latitude": xr.DataArray(np.arange(-90, 90, 2), dims="latitude"),
+            "latitude": xr.DataArray(np.arange(-90, 91, 2), dims="latitude"),
         }
     )
     ds = ds.cf.guess_coord_axis()

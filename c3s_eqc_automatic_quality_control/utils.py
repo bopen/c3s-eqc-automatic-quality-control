@@ -65,8 +65,8 @@ def regionalise(
     -------
     Cutout object
     """
-    lon_name = lon_name if lon_name is not None else get_coord_name(obj, "longitude")
-    lon_name = lat_name if lat_name is not None else get_coord_name(obj, "latitude")
+    lon_name = get_coord_name(obj, "longitude") if lon_name is None else lon_name
+    lat_name = get_coord_name(obj, "latitude") if lat_name is None else lat_name
     indexers = {lon_name: lon_slice, lat_name: lat_slice}
 
     # Convert longitude
