@@ -495,7 +495,9 @@ def download_and_transform(
         # Cache each chunk separately
         sources = []
         for request in tqdm.tqdm(request_list):
-            with cacholote.config.set(return_cache_entry=True):
+            with cacholote.config.set(
+                return_cache_entry=True, raise_all_encoding_errors=True
+            ):
                 cache_entry = download_and_transform_requests(
                     collection_id,
                     [request],
