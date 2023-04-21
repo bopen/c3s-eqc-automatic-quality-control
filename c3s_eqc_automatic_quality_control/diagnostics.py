@@ -68,14 +68,17 @@ def time_weighted_mean(
 
     Parameters
     ----------
-    obj: xr.Dataset or xr.DataArray
+    obj: DataArray or Dataset
         Input data
-    time: hashable, optional
+    time_name: hashable, optional
         Name of time coordinate
+    weights: DataArray, optional
+        Weights to apply (default is days per month)
 
     Returns
     -------
-    reduced object
+    DataArray or Dataset
+        Reduced object
     """
     return _time_weighted.TimeWeighted(obj, time_name, weights).reduce(
         "mean", None, **kwargs
@@ -93,14 +96,17 @@ def seasonal_weighted_mean(
 
     Parameters
     ----------
-    obj: xr.Dataset or xr.DataArray
+    obj: DataArray or Dataset
         Input data
-    time: hashable, optional
+    time_name: hashable, optional
         Name of time coordinate
+    weights: DataArray, optional
+        Weights to apply (default is days per month)
 
     Returns
     -------
-    reduced object
+    DataArray or Dataset
+        Reduced object
     """
     return _time_weighted.TimeWeighted(obj, time_name, weights).reduce(
         "mean", "season", **kwargs
@@ -118,14 +124,17 @@ def annual_weighted_mean(
 
     Parameters
     ----------
-    obj: xr.Dataset or xr.DataArray
+    obj: DataArray or Dataset
         Input data
-    time: hashable, optional
+    time_name: hashable, optional
         Name of time coordinate
+    weights: DataArray, optional
+        Weights to apply (default is days per month)
 
     Returns
     -------
-    reduced object
+    DataArray or Dataset
+        Reduced object
     """
     return _time_weighted.TimeWeighted(obj, time_name, weights).reduce(
         "mean", "year", **kwargs
@@ -144,14 +153,17 @@ def spatial_weighted_mean(
 
     Parameters
     ----------
-    obj: xr.Dataset or xr.DataArray
+    obj: DataArray or Dataset
         Input data
     lon_name, lat_name: str, optional
         Name of longitude/latitude coordinate
+    weights: DataArray, optional
+        Weights to apply (default is cosine of latitude)
 
     Returns
     -------
-    reduced object
+    DataArray or Dataset
+        Reduced object
     """
     return _spatial_weighted.SpatialWeighted(obj, lon_name, lat_name, weights).reduce(
         "mean", **kwargs
@@ -170,14 +182,17 @@ def spatial_weighted_std(
 
     Parameters
     ----------
-    obj: xr.Dataset or xr.DataArray
+    obj: DataArray or Dataset
         Input data
     lon_name, lat_name: str, optional
         Name of longitude/latitude coordinate
+    weights: DataArray, optional
+        Weights to apply (default is cosine of latitude)
 
     Returns
     -------
-    reduced object
+    DataArray or Dataset
+        Reduced object
     """
     return _spatial_weighted.SpatialWeighted(obj, lon_name, lat_name, weights).reduce(
         "std", **kwargs
@@ -196,14 +211,17 @@ def spatial_weighted_median(
 
     Parameters
     ----------
-    obj: xr.Dataset or xr.DataArray
+    obj: DataArray or Dataset
         Input data
     lon_name, lat_name: str, optional
         Name of longitude/latitude coordinate
+    weights: DataArray, optional
+        Weights to apply (default is cosine of latitude)
 
     Returns
     -------
-    reduced object
+    DataArray or Dataset
+        Reduced object
     """
     return _spatial_weighted.SpatialWeighted(obj, lon_name, lat_name, weights).reduce(
         "quantile", q=0.5, **kwargs
@@ -222,14 +240,17 @@ def spatial_weighted_statistics(
 
     Parameters
     ----------
-    obj: xr.Dataset or xr.DataArray
+    obj: DataArray or Dataset
         Input data
     lon_name, lat_name: str, optional
         Name of longitude/latitude coordinate
+    weights: DataArray, optional
+        Weights to apply (default is cosine of latitude)
 
     Returns
     -------
-    reduced object
+    DataArray or Dataset
+        Reduced object
     """
     sw = _spatial_weighted.SpatialWeighted(obj, lon_name, lat_name, weights)
     objects = []
@@ -256,14 +277,17 @@ def spatial_weighted_rmse(
 
     Parameters
     ----------
-    obj1, obj2: xr.Dataset or xr.DataArray
+    obj1, obj2: DataArray or Dataset
         Input data
     lon, lat: str, optional
         Name of longitude/latitude coordinate
+    weights: DataArray, optional
+        Weights to apply (default is cosine of latitude)
 
     Returns
     -------
-    reduced object
+    DataArray or Dataset
+        Reduced object
     """
     return _spatial_weighted.SpatialWeighted(obj1, lon_name, lat_name, weights).rmse(
         obj2, centralise=False, **kwargs
@@ -283,14 +307,17 @@ def spatial_weighted_crmse(
 
     Parameters
     ----------
-    obj1, obj2: xr.Dataset or xr.DataArray
+    obj1, obj2: DataArray or Dataset
         Input data
     lon, lat: str, optional
         Name of longitude/latitude coordinate
+    weights: DataArray, optional
+        Weights to apply (default is cosine of latitude)
 
     Returns
     -------
-    reduced object
+    DataArray or Dataset
+        Reduced object
     """
     return _spatial_weighted.SpatialWeighted(obj1, lon_name, lat_name, weights).rmse(
         obj2, centralise=True, **kwargs
@@ -314,10 +341,13 @@ def spatial_weighted_corr(
         Input data
     lon, lat: str, optional
         Name of longitude/latitude coordinate
+    weights: DataArray, optional
+        Weights to apply (default is cosine of latitude)
 
     Returns
     -------
-    reduced object
+    DataArray or Dataset
+        Reduced object
     """
     return _spatial_weighted.SpatialWeighted(obj1, lon_name, lat_name, weights).corr(
         obj2, **kwargs
@@ -341,10 +371,13 @@ def spatial_weighted_errors(
         Input data
     lon, lat: str, optional
         Name of longitude/latitude coordinate
+    weights: DataArray, optional
+        Weights to apply (default is cosine of latitude)
 
     Returns
     -------
-    reduced object
+    DataArray or Dataset
+        Reduced object
     """
     sw = _spatial_weighted.SpatialWeighted(obj1, lon_name, lat_name, weights)
     objects = []
