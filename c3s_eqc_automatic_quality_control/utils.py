@@ -39,7 +39,7 @@ def get_coord_name(obj: xr.DataArray | xr.Dataset, coordinate: str) -> Hashable:
         coords = list(set(coords) & set(obj.dims))
     if len(coords) == 1:
         return coords[0]
-    raise ValueError(f"Can NOT infer {coordinate}: {coords}")
+    raise ValueError(f"Can NOT infer {coordinate!r}: {coords!r}")
 
 
 @keep_attrs

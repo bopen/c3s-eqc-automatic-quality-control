@@ -19,12 +19,11 @@ This module gathers available diagnostics.
 
 from typing import Any, Hashable
 
-import cacholote
 import pyproj
-import shapely
 import xarray as xr
+from xarray.core.common import DataWithCoords
 
-from . import _regrid, _spatial_weighted, _time_weighted
+from . import _grid_cell_area, _regrid, _spatial_weighted, _time_weighted
 
 
 def regrid(
@@ -142,7 +141,7 @@ def annual_weighted_mean(
 
 
 def spatial_weighted_mean(
-    obj: xr.Dataset | xr.DataArray,
+    obj: xr.DataArray | xr.Dataset,
     lon_name: Hashable | None = None,
     lat_name: Hashable | None = None,
     weights: xr.DataArray | None = None,
@@ -171,7 +170,7 @@ def spatial_weighted_mean(
 
 
 def spatial_weighted_std(
-    obj: xr.Dataset | xr.DataArray,
+    obj: xr.DataArray | xr.Dataset,
     lon_name: Hashable | None = None,
     lat_name: Hashable | None = None,
     weights: xr.DataArray | None = None,
@@ -200,7 +199,7 @@ def spatial_weighted_std(
 
 
 def spatial_weighted_median(
-    obj: xr.Dataset | xr.DataArray,
+    obj: xr.DataArray | xr.Dataset,
     lon_name: Hashable | None = None,
     lat_name: Hashable | None = None,
     weights: xr.DataArray | None = None,
@@ -229,7 +228,7 @@ def spatial_weighted_median(
 
 
 def spatial_weighted_statistics(
-    obj: xr.Dataset | xr.DataArray,
+    obj: xr.DataArray | xr.Dataset,
     lon_name: Hashable | None = None,
     lat_name: Hashable | None = None,
     weights: xr.DataArray | None = None,
@@ -265,8 +264,8 @@ def spatial_weighted_statistics(
 
 
 def spatial_weighted_rmse(
-    obj1: xr.Dataset | xr.DataArray,
-    obj2: xr.Dataset | xr.DataArray,
+    obj1: xr.DataArray | xr.Dataset,
+    obj2: xr.DataArray | xr.Dataset,
     lon_name: Hashable | None = None,
     lat_name: Hashable | None = None,
     weights: xr.DataArray | None = None,
@@ -295,8 +294,8 @@ def spatial_weighted_rmse(
 
 
 def spatial_weighted_crmse(
-    obj1: xr.Dataset | xr.DataArray,
-    obj2: xr.Dataset | xr.DataArray,
+    obj1: xr.DataArray | xr.Dataset,
+    obj2: xr.DataArray | xr.Dataset,
     lon_name: Hashable | None = None,
     lat_name: Hashable | None = None,
     weights: xr.DataArray | None = None,
@@ -325,8 +324,8 @@ def spatial_weighted_crmse(
 
 
 def spatial_weighted_corr(
-    obj1: xr.Dataset | xr.DataArray,
-    obj2: xr.Dataset | xr.DataArray,
+    obj1: xr.DataArray | xr.Dataset,
+    obj2: xr.DataArray | xr.Dataset,
     lon_name: Hashable | None = None,
     lat_name: Hashable | None = None,
     weights: xr.DataArray | None = None,
@@ -355,8 +354,8 @@ def spatial_weighted_corr(
 
 
 def spatial_weighted_errors(
-    obj1: xr.Dataset | xr.DataArray,
-    obj2: xr.Dataset | xr.DataArray,
+    obj1: xr.DataArray | xr.Dataset,
+    obj2: xr.DataArray | xr.Dataset,
     lon_name: Hashable | None = None,
     lat_name: Hashable | None = None,
     weights: xr.DataArray | None = None,
@@ -392,58 +391,33 @@ def spatial_weighted_errors(
     return ds[obj1.name] if isinstance(obj1, xr.DataArray) else ds
 
 
-def _poly_area(lon_bounds, lat_bounds, geod):  # type: ignore  # TODO: add typing
-    if len(lon_bounds) == len(lat_bounds) == 2:
-        lon_bounds = sorted(lon_bounds) + sorted(lon_bounds, reverse=True)
-        lat_bounds = [lat for lat in lat_bounds for _ in range(2)]
-    polygon = shapely.Polygon(zip(lon_bounds, lat_bounds))
-    return abs(geod.geometry_area_perimeter(polygon)[0])
-
-
-@cacholote.cacheable
-def _cached_grid_cell_area(
-    lon_bounds: dict[str, Any],
-    lat_bounds: dict[str, Any],
-    bounds_dim: set[str],
-    geod: pyproj.Geod,
-) -> xr.Dataset:
-    area = xr.apply_ufunc(
-        _poly_area,
-        xr.DataArray.from_dict(lon_bounds),
-        xr.DataArray.from_dict(lat_bounds),
-        input_core_dims=[tuple(bounds_dim) for _ in range(2)],
-        kwargs={"geod": geod},
-        vectorize=True,
-    )
-    area.attrs["standard_name"] = "cell_area"
-    cf_area: xr.DataArray = area.cf.add_canonical_attributes()
-    return cf_area.to_dataset(name="cell_area")
-
-
 def grid_cell_area(
-    obj: xr.Dataset | xr.DataArray, geod: pyproj.Geod = pyproj.Geod(ellps="WGS84")
+    obj: DataWithCoords, geod: pyproj.Geod = pyproj.Geod(ellps="WGS84")
 ) -> xr.DataArray:
     """
     Calculate the area of a cell, in meters^2, on a lat/lon grid.
 
     Parameters
     ----------
-    obj: xr.Dataset or xr.DataArray
+    obj: Dataset or DataArray
         Input object with coordinates
     geod: pyproj.Geod
         Projection (default is WGS84)
 
     Returns
     -------
-    xr.DataArray
+    DataArray
         Grid cell area
     """
-    bounds = []
-    bounds_dim = set()
+    if isinstance(obj, xr.DataArray):
+        obj = obj.to_dataset(name=obj.name or "None")
+
     for coord in ("longitude", "latitude"):
         if coord not in obj.cf.bounds:
             obj = obj.cf.add_bounds(coord)
-        da = obj.cf.get_bounds(coord)
-        bounds_dim.update(set(da.dims) - set(obj.cf[coord].dims))
-        bounds.append(da.to_dict())
-    return _cached_grid_cell_area(bounds[0], bounds[1], bounds_dim, geod)["cell_area"]
+
+    return _grid_cell_area.cached_grid_cell_area(
+        obj.cf.get_bounds("longitude").to_dict(),
+        obj.cf.get_bounds("latitude").to_dict(),
+        geod,
+    )["cell_area"]

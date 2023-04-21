@@ -70,7 +70,7 @@ class TimeWeighted:
     def reduce(
         self, func_name: str, group: str | None = None, **kwargs: Any
     ) -> xr.DataArray | xr.Dataset:
-        kwargs.setdefault("dim", self.time.dims)
+        kwargs.setdefault("dim", self.obj_weighted.weights.dims)
 
         if group is not None:
             return self.groupby_reduce(func_name, group, **kwargs)

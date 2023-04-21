@@ -173,15 +173,17 @@ def test_regrid(obj: xr.DataArray | xr.Dataset) -> None:
 
 
 def test_grid_cell_area() -> None:
-    geod = pyproj.Geod(ellps="WGS84")
+    fs, dirname = cacholote.utils.get_cache_files_fs_dirname()
+    assert fs.ls(dirname) == []  # cache is empty
 
     # Compute area spheroid
+    geod = pyproj.Geod(ellps="WGS84")
     e = np.sqrt(2 * geod.f - geod.f**2)
     first = 2 * np.pi * geod.a**2
     second = (np.pi * geod.b**2 / e) * np.log((1 + e) / (1 - e))
     expected = first + second
 
-    # Get area
+    # Global coordinates
     ds = xr.Dataset(
         {
             "longitude": xr.DataArray(np.arange(-180, 180, 10), dims="longitude"),
@@ -189,7 +191,9 @@ def test_grid_cell_area() -> None:
         }
     )
     ds = ds.cf.guess_coord_axis()
-    with cacholote.config.set(use_cache=False):
-        actual = diagnostics.grid_cell_area(ds).sum().values
+    da = ds["longitude"] * ds["latitude"]
 
-    np.testing.assert_approx_equal(actual, expected, significant=4)
+    for obj in (ds, da):
+        actual = diagnostics.grid_cell_area(obj).sum().values
+        np.testing.assert_approx_equal(actual, expected, significant=4)
+        assert len(fs.ls(dirname)) == 1  # re-use weights
