@@ -153,6 +153,25 @@ def test_annual_weighted_mean(obj: xr.DataArray | xr.Dataset) -> None:
     xr.testing.assert_allclose(expected, actual.fillna(0))
 
 
+@pytest.mark.parametrize(
+    "obj",
+    [
+        xr.tutorial.open_dataset("era5-2mt-2019-03-uk.grib"),
+        xr.tutorial.open_dataset("era5-2mt-2019-03-uk.grib")["t2m"],
+    ],
+)
+def test_regrid(obj: xr.DataArray | xr.Dataset) -> None:
+    fs, dirname = cacholote.utils.get_cache_files_fs_dirname()
+    assert fs.ls(dirname) == []  # cache is empty
+
+    for _, obj in obj.isel(time=slice(2)).groupby("time"):
+        expected = obj.isel(longitude=slice(10), latitude=slice(10))
+        actual = diagnostics.regrid(obj, expected, "nearest_s2d")
+        xr.testing.assert_equal(actual, expected)
+        assert actual.attrs["regrid_method"] == "nearest_s2d"
+        assert len(fs.ls(dirname)) == 1  # re-use weights
+
+
 def test_grid_cell_area() -> None:
     geod = pyproj.Geod(ellps="WGS84")
 

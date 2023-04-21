@@ -23,45 +23,36 @@ import cacholote
 import pyproj
 import shapely
 import xarray as xr
-import xesmf as xe
 
-from . import _spatial_weighted, _time_weighted
-
-
-@cacholote.cacheable
-def _regridder_weights(
-    dict_in: dict[str, Any], dict_out: dict[str, Any], method: str, **kwargs: Any
-) -> xr.Dataset:
-    weights: xr.Dataset = xe.Regridder(
-        xr.Dataset.from_dict(dict_in), xr.Dataset.from_dict(dict_out), method, **kwargs
-    ).weights
-    return weights
-
-
-def _grid_to_dict(grid: xr.Dataset) -> dict[str, Any]:
-    coords = []
-    for coord in ("longitude", "latitude"):
-        coords.extend(grid.cf.coordinates[coord])
-        coords.extend(grid.cf.bounds.get(coord, []))
-    grid_dict: dict[str, Any] = grid[coords].to_dict()
-    grid_dict.pop("attrs")
-    return grid_dict
-
-
-def _regridder(
-    grid_in: xr.Dataset, grid_out: xr.Dataset, method: str, **kwargs: Any
-) -> xe.Regridder:
-    # Remove metadata and cache using dicts
-    dict_in = _grid_to_dict(grid_in)
-    dict_out = _grid_to_dict(grid_out)
-    kwargs["weights"] = _regridder_weights(dict_in, dict_out, method, **kwargs)
-    return xe.Regridder(grid_in, grid_out, method, **kwargs)
+from . import _regrid, _spatial_weighted, _time_weighted
 
 
 def regrid(
-    obj: xr.Dataset, grid_out: xr.Dataset, method: str, **kwargs: Any
-) -> xr.Dataset:
-    regridder = _regridder(obj, grid_out, method, **kwargs)
+    obj: xr.DataArray | xr.Dataset,
+    grid_out: xr.DataArray | xr.Dataset,
+    method: str,
+    **kwargs: Any,
+) -> xr.DataArray | xr.Dataset:
+    """
+    Regrid object.
+
+    Parameters
+    ----------
+    obj: DataArray or Dataset
+        Object to regrid
+    grid_out: DataArray or Dataset
+        Output grid
+    method: str
+        xesmf interpolation method
+    **kwargs: Any
+        keyword arguments for xesmf
+
+    Returns
+    -------
+    DataArray or Dataset
+        Interpolated object
+    """
+    regridder = _regrid.cached_regridder(obj, grid_out, method, **kwargs)
     obj = regridder(obj, keep_attrs=True)
     return obj
 
