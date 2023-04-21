@@ -1,6 +1,6 @@
 import dataclasses
 import functools
-from typing import Any, Callable, Hashable, TypeVar, overload
+from typing import Any, Hashable, TypeVar, overload
 
 import xarray as xr
 from typing_extensions import ParamSpec
@@ -10,14 +10,6 @@ from . import utils
 
 P = ParamSpec("P")
 T = TypeVar("T")
-
-
-def keep_attrs(func: Callable[P, T]) -> Callable[P, T]:
-    def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
-        with xr.set_options(keep_attrs=True):  # type: ignore[no-untyped-call]
-            return func(*args, **kwargs)
-
-    return wrapper
 
 
 @dataclasses.dataclass
