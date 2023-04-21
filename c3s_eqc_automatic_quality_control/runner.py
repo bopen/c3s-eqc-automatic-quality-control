@@ -139,7 +139,6 @@ def run_aqc(
                 collection_id=request["collection_id"],
                 requests=req,
                 chunks=chunks,
-                logger=logger,
                 transform_func=getattr(diagnostics, d),
             )
 

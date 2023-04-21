@@ -21,7 +21,6 @@ import calendar
 import fnmatch
 import functools
 import itertools
-import logging
 import pathlib
 from collections.abc import Callable
 from typing import Any
@@ -441,7 +440,6 @@ def download_and_transform(
     transform_func: Callable[..., xr.Dataset] | None = None,
     transform_func_kwargs: dict[str, Any] = {},
     transform_chunks: bool = True,
-    logger: logging.Logger | None = None,
     **open_mfdataset_kwargs: Any,
 ) -> xr.Dataset:
     """
@@ -474,8 +472,6 @@ def download_and_transform(
     -------
     xr.Dataset
     """
-    logger = logger or LOGGER  # TODO: just for backward compatibility with runner
-
     download_and_transform_requests = _download_and_transform_requests
     if is_cached := transform_func is not None:
         download_and_transform_requests = cacholote.cacheable(
