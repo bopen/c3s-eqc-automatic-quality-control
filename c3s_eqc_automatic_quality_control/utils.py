@@ -13,7 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Callable, TypeVar
+from typing import Callable, Hashable, TypeVar
 
 import xarray as xr
 from typing_extensions import ParamSpec
@@ -30,42 +30,25 @@ def keep_attrs(func: Callable[P, T]) -> Callable[P, T]:
     return wrapper
 
 
-def _get_time(obj: xr.Dataset | xr.DataArray, time: str | None) -> str:
-    if time:
-        return time
-
-    times: set[str] = set(obj.cf.coordinates.get("time", [])) & set(obj.dims)
-    if len(times) == 1:
-        return list(times)[0]
-    raise ValueError("Can NOT auto infer time dimension.")
-
-
-def _get_coord_excluding_bounds(obj: xr.Dataset | xr.DataArray, coord_name: str) -> str:
-    coords: list[str] = obj.cf.coordinates[coord_name]
+def get_coord_name(obj: xr.DataArray | xr.Dataset, coordinate: str) -> Hashable:
+    coords: list[Hashable] = obj.cf.coordinates.get(coordinate, [])
     if isinstance(obj, xr.Dataset):
-        bounds = obj.cf.bounds.get(coord_name, [])
+        bounds = obj.cf.bounds.get(coordinate, [])
         coords = list(set(coords) - set(bounds))
+    if coordinate == "time":
+        coords = list(set(coords) & set(obj.dims))
     if len(coords) == 1:
         return coords[0]
-    raise ValueError(f"Can not infer {coord_name!r}: {coords!r}")
+    raise ValueError(f"Can NOT infer {coordinate}: {coords}")
 
 
-def _get_lon_and_lat(
-    obj: xr.Dataset | xr.DataArray, lon: str | None, lat: str | None
-) -> tuple[str, str]:
-    if lon is None:
-        lon = _get_coord_excluding_bounds(obj, "longitude")
-    if lat is None:
-        lat = _get_coord_excluding_bounds(obj, "latitude")
-    return lon, lat
-
-
+@keep_attrs
 def regionalise(
     obj: xr.Dataset | xr.DataArray,
     lon_slice: slice = slice(None, None, None),
     lat_slice: slice = slice(None, None, None),
-    lon_name: str | None = None,
-    lat_name: str | None = None,
+    lon_name: Hashable | None = None,
+    lat_name: Hashable | None = None,
 ) -> xr.Dataset | xr.DataArray:
     """Extract a region cutout.
 
@@ -82,19 +65,18 @@ def regionalise(
     -------
     Cutout object
     """
-    lon_name, lat_name = _get_lon_and_lat(obj, lon_name, lat_name)
+    lon_name = lon_name if lon_name is not None else get_coord_name(obj, "longitude")
+    lon_name = lat_name if lat_name is not None else get_coord_name(obj, "latitude")
     indexers = {lon_name: lon_slice, lat_name: lat_slice}
 
     # Convert longitude
     lon_limits = xr.DataArray([lon_slice.start, lon_slice.stop], dims=lon_name)
     lon_limits = lon_limits.dropna(lon_name)
     if (lon_limits < 0).any() and (obj[lon_name] >= 0).all():
-        with xr.set_options(keep_attrs=True):  # type: ignore[no-untyped-call]
-            obj[lon_name] = (obj[lon_name] + 180) % 360 - 180
+        obj[lon_name] = (obj[lon_name] + 180) % 360 - 180
         obj[lon_name] = obj[lon_name].sortby(lon_name)
     elif (lon_limits > 180).any() and (obj[lon_name] <= 180).all():
-        with xr.set_options(keep_attrs=True):  # type: ignore[no-untyped-call]
-            obj[lon_name] = obj[lon_name] % 360
+        obj[lon_name] = obj[lon_name] % 360
         obj[lon_name] = obj[lon_name].sortby(lon_name)
 
     # Sort

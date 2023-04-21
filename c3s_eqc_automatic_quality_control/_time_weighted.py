@@ -34,17 +34,9 @@ class TimeWeighted:
                 dim=str(
                     self.time_name
                     if self.time_name is not None
-                    else self.get_coord_name("time")
+                    else utils.get_coord_name(self.obj, "time")
                 ),
             )
-
-    def get_coord_name(self, coordinate: str) -> Hashable:
-        times: set[Hashable] = set(self.obj.cf.coordinates.get(coordinate, [])) & set(
-            self.obj.dims
-        )
-        if len(times) == 1:
-            return list(times)[0]
-        raise ValueError(f"Can NOT infer time: {times}")
 
     @functools.cached_property
     def time(self) -> xr.DataArray:
@@ -52,7 +44,7 @@ class TimeWeighted:
             self.obj[
                 self.time_name
                 if self.time_name is not None
-                else self.get_coord_name("time")
+                else utils.get_coord_name(self.obj, "time")
             ]
         )
 

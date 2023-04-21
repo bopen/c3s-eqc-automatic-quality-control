@@ -22,15 +22,6 @@ class SpatialWeighted:
     lat_name: Hashable | None
     weights: xr.DataArray | None
 
-    def get_coord_name(self, coordinate: str) -> Hashable:
-        coords: list[Hashable] = self.obj.cf.coordinates[coordinate]
-        if isinstance(self.obj, xr.Dataset):
-            bounds = self.obj.cf.bounds.get(coordinate, [])
-            coords = list(set(coords) - set(bounds))
-        if len(coords) == 1:
-            return coords[0]
-        raise ValueError(f"Can NOT infer {coordinate!r}: {coords!r}")
-
     @functools.cached_property
     def kwargs(self) -> SpatialWeightedKwargs:
         return SpatialWeightedKwargs(
@@ -45,7 +36,7 @@ class SpatialWeighted:
             self.obj[
                 self.lon_name
                 if self.lon_name is not None
-                else self.get_coord_name("longitude")
+                else utils.get_coord_name(self.obj, "longitude")
             ]
         )
 
@@ -55,7 +46,7 @@ class SpatialWeighted:
             self.obj[
                 self.lat_name
                 if self.lat_name is not None
-                else self.get_coord_name("latitude")
+                else utils.get_coord_name(self.obj, "latitude")
             ]
         )
 

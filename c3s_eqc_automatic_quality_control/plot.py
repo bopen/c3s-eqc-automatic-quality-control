@@ -17,7 +17,7 @@ This module offers plot functions to visualise diagnostic results.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import warnings
-from typing import Any, Iterable
+from typing import Any, Hashable, Iterable
 
 import cartopy.crs as ccrs
 import matplotlib.colors
@@ -412,7 +412,7 @@ def lccs_bar(
 
 
 def seasonal_boxplot(
-    da: xr.DataArray, time_dim: str | None = None, **kwargs: Any
+    da: xr.DataArray, time_dim: Hashable | None = None, **kwargs: Any
 ) -> "pd.Series[Axes]":
     """
     Plot a seasonal boxplot.
@@ -432,7 +432,8 @@ def seasonal_boxplot(
     """
     kwargs.setdefault("ylabel", xr.plot.utils.label_from_attrs(da))
     kwargs.setdefault("layout", (1, 4))
-    time_dim = utils._get_time(da, time_dim)
+    if time_dim is None:
+        time_dim = utils.get_coord_name(da, "time")
 
     da = da.stack(stacked_dim=da.dims)
     df = da.to_dataframe()

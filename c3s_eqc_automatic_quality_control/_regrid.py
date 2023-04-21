@@ -20,7 +20,7 @@ def regridder_weights(
 def grid_to_dict(grid: xr.Dataset | xr.DataArray) -> dict[str, Any]:
     if isinstance(grid, xr.DataArray):
         grid = grid.to_dataset(name=grid.name or "__grid__")
-    grid = grid.drop((var for var, da in grid.variables.items() if not da.dims))
+    grid = grid.drop_vars((var for var, da in grid.variables.items() if not da.dims))
     coords = set()
     for coord in ("longitude", "latitude"):
         coords |= set(grid.cf.coordinates[coord] + grid.cf.bounds.get(coord, []))
