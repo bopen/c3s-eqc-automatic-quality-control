@@ -15,6 +15,7 @@ dependencies:
 - dask
 - fsspec
 - geopandas
+- libnetcdf != 4.9.1
 - matplotlib
 - netCDF4
 - pandas
@@ -24,6 +25,7 @@ dependencies:
 - python-dotenv
 - pyyaml
 - rich
+- rioxarray
 - sqlalchemy
 - typer
 - toml

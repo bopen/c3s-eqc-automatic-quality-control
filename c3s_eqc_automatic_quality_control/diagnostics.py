@@ -17,314 +17,319 @@ This module gathers available diagnostics.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any
+from typing import Any, Hashable
 
-import cacholote
-import numpy as np
 import pyproj
-import shapely
 import xarray as xr
-import xesmf as xe
+from xarray.core.common import DataWithCoords
 
-from . import utils
-
-
-def _spatial_weights(
-    obj: xr.Dataset | xr.DataArray, lon: str | None = None, lat: str | None = None
-) -> xr.DataArray:
-    lon, lat = utils._get_lon_and_lat(obj, lon, lat)
-    cos = np.cos(np.deg2rad(obj[lat]))
-    weights: xr.DataArray = cos / (cos.sum(lat) * len(obj[lon]))
-    return weights
-
-
-@cacholote.cacheable
-def _regridder_weights(
-    dict_in: dict[str, Any], dict_out: dict[str, Any], method: str, **kwargs: Any
-) -> xr.Dataset:
-    weights: xr.Dataset = xe.Regridder(
-        xr.Dataset.from_dict(dict_in), xr.Dataset.from_dict(dict_out), method, **kwargs
-    ).weights
-    return weights
-
-
-def _grid_to_dict(grid: xr.Dataset) -> dict[str, Any]:
-    coords = []
-    for coord in ("longitude", "latitude"):
-        coords.extend(grid.cf.coordinates[coord])
-        coords.extend(grid.cf.bounds.get(coord, []))
-    grid_dict: dict[str, Any] = grid[coords].to_dict()
-    grid_dict.pop("attrs")
-    return grid_dict
-
-
-def _regridder(
-    grid_in: xr.Dataset, grid_out: xr.Dataset, method: str, **kwargs: Any
-) -> xe.Regridder:
-    # Remove metadata and cache using dicts
-    dict_in = _grid_to_dict(grid_in)
-    dict_out = _grid_to_dict(grid_out)
-    kwargs["weights"] = _regridder_weights(dict_in, dict_out, method, **kwargs)
-    return xe.Regridder(grid_in, grid_out, method, **kwargs)
+from . import _grid_cell_area, _regrid, _spatial_weighted, _time_weighted
 
 
 def regrid(
-    obj: xr.Dataset, grid_out: xr.Dataset, method: str, **kwargs: Any
-) -> xr.Dataset:
-    regridder = _regridder(obj, grid_out, method, **kwargs)
+    obj: xr.DataArray | xr.Dataset,
+    grid_out: xr.DataArray | xr.Dataset,
+    method: str,
+    **kwargs: Any,
+) -> xr.DataArray | xr.Dataset:
+    """
+    Regrid object.
+
+    Parameters
+    ----------
+    obj: DataArray or Dataset
+        Object to regrid
+    grid_out: DataArray or Dataset
+        Output grid
+    method: str
+        xesmf interpolation method
+    **kwargs: Any
+        keyword arguments for xesmf
+
+    Returns
+    -------
+    DataArray or Dataset
+        Interpolated object
+    """
+    regridder = _regrid.cached_regridder(obj, grid_out, method, **kwargs)
     obj = regridder(obj, keep_attrs=True)
     return obj
 
 
-def seasonal_weighted_mean(obj: xr.Dataset, time: str | None = None) -> xr.Dataset:
+def time_weighted_mean(
+    obj: xr.DataArray | xr.Dataset,
+    time_name: Hashable | None = None,
+    weights: xr.DataArray | None = None,
+    **kwargs: Any,
+) -> xr.DataArray | xr.Dataset:
+    """
+    Calculate time weighted mean.
+
+    Parameters
+    ----------
+    obj: DataArray or Dataset
+        Input data
+    time_name: hashable, optional
+        Name of time coordinate
+    weights: DataArray, optional
+        Weights to apply (default is days per month)
+
+    Returns
+    -------
+    DataArray or Dataset
+        Reduced object
+    """
+    return _time_weighted.TimeWeighted(obj, time_name, weights).reduce(
+        "mean", None, **kwargs
+    )
+
+
+def seasonal_weighted_mean(
+    obj: xr.DataArray | xr.Dataset,
+    time_name: Hashable | None = None,
+    weights: xr.DataArray | None = None,
+    **kwargs: Any,
+) -> xr.DataArray | xr.Dataset:
     """
     Calculate seasonal weighted mean.
 
     Parameters
     ----------
-    obj: xr.Dataset
+    obj: DataArray or Dataset
         Input data
-    time: str, optional
+    time_name: hashable, optional
         Name of time coordinate
+    weights: DataArray, optional
+        Weights to apply (default is days per month)
 
     Returns
     -------
-    reduced object
+    DataArray or Dataset
+        Reduced object
     """
-    time = utils._get_time(obj, time)
-
-    with xr.set_options(keep_attrs=True):  # type: ignore[no-untyped-call]
-        obj = obj.convert_calendar("noleap", align_on="date", dim=time)
-        month_length = obj[time].dt.days_in_month
-        weights = (
-            month_length.groupby(f"{time}.season")
-            / month_length.groupby(f"{time}.season").sum()
-        )
-        obj = (obj * weights).groupby(f"{time}.season").sum(dim=time)
-    return obj
+    return _time_weighted.TimeWeighted(obj, time_name, weights).reduce(
+        "mean", "season", **kwargs
+    )
 
 
-def annual_weighted_mean(obj: xr.Dataset, time: str | None = None) -> xr.Dataset:
+def annual_weighted_mean(
+    obj: xr.DataArray | xr.Dataset,
+    time_name: Hashable | None = None,
+    weights: xr.DataArray | None = None,
+    **kwargs: Any,
+) -> xr.DataArray | xr.Dataset:
     """
     Calculate annual weighted mean.
 
     Parameters
     ----------
-    obj: xr.Dataset
+    obj: DataArray or Dataset
         Input data
-    time: str, optional
+    time_name: hashable, optional
         Name of time coordinate
+    weights: DataArray, optional
+        Weights to apply (default is days per month)
 
     Returns
     -------
-    reduced object
+    DataArray or Dataset
+        Reduced object
     """
-    time = utils._get_time(obj, time)
-
-    season_obj = seasonal_weighted_mean(obj, time)
-    with xr.set_options(keep_attrs=True):  # type: ignore[no-untyped-call]
-        obj = obj.convert_calendar("noleap", align_on="date", dim=time)
-        month_length = obj[time].dt.days_in_month
-        weights = month_length.groupby(f"{time}.season").sum() / (
-            month_length.groupby(f"{time}.season").sum().sum()
-        )
-        obj = (season_obj * weights).sum(dim="season") / weights.sum("season")
-    return obj
-
-
-def annual_weighted_mean_timeseries(
-    obj: xr.Dataset, time: str | None = None
-) -> xr.Dataset:
-    """
-    Calculate annual weighted mean timeseries.
-
-    Parameters
-    ----------
-    obj: xr.Dataset
-        Input data
-    time: str, optional
-        Name of time coordinate
-
-    Returns
-    -------
-    reduced object
-    """
-    time = utils._get_time(obj, time)
-    return obj.groupby(f"{time}.year").map(annual_weighted_mean)
-
-
-def _spatial_weighted_reduction(
-    obj: xr.Dataset | xr.DataArray,
-    func: str,
-    lon: str | None = None,
-    lat: str | None = None,
-    **kwargs: Any,
-) -> xr.Dataset | xr.DataArray:
-    lon, lat = utils._get_lon_and_lat(obj, lon, lat)
-    with xr.set_options(keep_attrs=True):  # type: ignore[no-untyped-call]
-        weights = _spatial_weights(obj, lon, lat)
-        obj = getattr(obj.weighted(weights), func)(dim=(lon, lat), **kwargs)
-    return obj
+    return _time_weighted.TimeWeighted(obj, time_name, weights).reduce(
+        "mean", "year", **kwargs
+    )
 
 
 def spatial_weighted_mean(
-    obj: xr.Dataset | xr.DataArray, lon: str | None = None, lat: str | None = None
+    obj: xr.DataArray | xr.Dataset,
+    lon_name: Hashable | None = None,
+    lat_name: Hashable | None = None,
+    weights: xr.DataArray | None = None,
+    **kwargs: Any,
 ) -> xr.Dataset | xr.DataArray:
     """
     Calculate spatial mean of ds with latitude weighting.
 
     Parameters
     ----------
-    obj: xr.Dataset or xr.DataArray
+    obj: DataArray or Dataset
         Input data
-    lon, lat: str, optional
+    lon_name, lat_name: str, optional
         Name of longitude/latitude coordinate
+    weights: DataArray, optional
+        Weights to apply (default is cosine of latitude)
 
     Returns
     -------
-    reduced object
+    DataArray or Dataset
+        Reduced object
     """
-    return _spatial_weighted_reduction(obj, "mean", lon, lat)
+    return _spatial_weighted.SpatialWeighted(obj, lon_name, lat_name, weights).reduce(
+        "mean", **kwargs
+    )
 
 
 def spatial_weighted_std(
-    obj: xr.Dataset | xr.DataArray, lon: str | None = None, lat: str | None = None
+    obj: xr.DataArray | xr.Dataset,
+    lon_name: Hashable | None = None,
+    lat_name: Hashable | None = None,
+    weights: xr.DataArray | None = None,
+    **kwargs: Any,
 ) -> xr.Dataset | xr.DataArray:
     """
-    Calculate spatial std with latitude weighting.
+    Calculate spatial std of ds with latitude weighting.
 
     Parameters
     ----------
-    obj: xr.Dataset or xr.DataArray
+    obj: DataArray or Dataset
         Input data
-    lon, lat: str, optional
+    lon_name, lat_name: str, optional
         Name of longitude/latitude coordinate
+    weights: DataArray, optional
+        Weights to apply (default is cosine of latitude)
 
     Returns
     -------
-    reduced object
+    DataArray or Dataset
+        Reduced object
     """
-    return _spatial_weighted_reduction(obj, "std", lon, lat)
+    return _spatial_weighted.SpatialWeighted(obj, lon_name, lat_name, weights).reduce(
+        "std", **kwargs
+    )
 
 
 def spatial_weighted_median(
-    obj: xr.Dataset | xr.DataArray, lon: str | None = None, lat: str | None = None
+    obj: xr.DataArray | xr.Dataset,
+    lon_name: Hashable | None = None,
+    lat_name: Hashable | None = None,
+    weights: xr.DataArray | None = None,
+    **kwargs: Any,
 ) -> xr.Dataset | xr.DataArray:
     """
-    Calculate spatial median with latitude weighting.
+    Calculate spatial mean of ds with latitude weighting.
 
     Parameters
     ----------
-    obj: xr.Dataset or xr.DataArray
+    obj: DataArray or Dataset
         Input data
-    lon, lat: str, optional
+    lon_name, lat_name: str, optional
         Name of longitude/latitude coordinate
+    weights: DataArray, optional
+        Weights to apply (default is cosine of latitude)
 
     Returns
     -------
-    reduced object
+    DataArray or Dataset
+        Reduced object
     """
-    return _spatial_weighted_reduction(obj, "quantile", lon, lat, q=0.5)
+    return _spatial_weighted.SpatialWeighted(obj, lon_name, lat_name, weights).reduce(
+        "quantile", q=0.5, **kwargs
+    )
 
 
 def spatial_weighted_statistics(
-    obj: xr.Dataset | xr.DataArray, lon: str | None = None, lat: str | None = None
+    obj: xr.DataArray | xr.Dataset,
+    lon_name: Hashable | None = None,
+    lat_name: Hashable | None = None,
+    weights: xr.DataArray | None = None,
+    **kwargs: Any,
 ) -> xr.Dataset | xr.DataArray:
     """
-    Calculate spatial mean, std, and median with latitude weighting.
+    Calculate spatial mean, std, and median of ds with latitude weighting.
 
     Parameters
     ----------
-    obj: xr.Dataset or xr.DataArray
+    obj: DataArray or Dataset
         Input data
-    lon, lat: str, optional
+    lon_name, lat_name: str, optional
         Name of longitude/latitude coordinate
+    weights: DataArray, optional
+        Weights to apply (default is cosine of latitude)
 
     Returns
     -------
-    reduced object
+    DataArray or Dataset
+        Reduced object
     """
+    sw = _spatial_weighted.SpatialWeighted(obj, lon_name, lat_name, weights)
     objects = []
-    for func in (spatial_weighted_mean, spatial_weighted_std, spatial_weighted_median):
-        objects.append(
-            func(obj, lon, lat).expand_dims(
-                diagnostic=[func.__name__.replace("spatial_weighted_", "")]
-            )
-        )
+    for func in ("mean", "std", "median"):
+        if func == "median":
+            obj = sw.reduce("quantile", q=0.5, **kwargs)
+        else:
+            obj = sw.reduce(func, **kwargs)
+        objects.append(obj.expand_dims(diagnostic=[func]))
     ds = xr.merge(objects)
-    if isinstance(obj, xr.DataArray):
-        return ds[obj.name]
-    return ds
-
-
-def _spatial_weighted_rmse(
-    obj1: xr.Dataset | xr.DataArray,
-    obj2: xr.Dataset | xr.DataArray,
-    lon: str | None = None,
-    lat: str | None = None,
-    centralise: bool = False,
-) -> xr.Dataset | xr.DataArray:
-    lon, lat = utils._get_lon_and_lat(obj1, lon, lat)
-    with xr.set_options(keep_attrs=True):  # type: ignore[no-untyped-call]
-        weights = _spatial_weights(obj1, lon, lat)
-        if centralise:
-            obj1 -= spatial_weighted_mean(obj1)
-            obj2 -= spatial_weighted_mean(obj2)
-        obj = (obj1 - obj2) ** 2
-        return obj.weighted(weights).mean((lon, lat)) ** 0.5
+    return ds[obj.name] if isinstance(obj, xr.DataArray) else ds
 
 
 def spatial_weighted_rmse(
-    obj1: xr.Dataset | xr.DataArray,
-    obj2: xr.Dataset | xr.DataArray,
-    lon: str | None = None,
-    lat: str | None = None,
+    obj1: xr.DataArray | xr.Dataset,
+    obj2: xr.DataArray | xr.Dataset,
+    lon_name: Hashable | None = None,
+    lat_name: Hashable | None = None,
+    weights: xr.DataArray | None = None,
+    **kwargs: Any,
 ) -> xr.Dataset | xr.DataArray:
     """
     Calculate spatial rmse with latitude weighting.
 
     Parameters
     ----------
-    obj1, obj2: xr.Dataset or xr.DataArray
+    obj1, obj2: DataArray or Dataset
         Input data
     lon, lat: str, optional
         Name of longitude/latitude coordinate
+    weights: DataArray, optional
+        Weights to apply (default is cosine of latitude)
 
     Returns
     -------
-    reduced object
+    DataArray or Dataset
+        Reduced object
     """
-    return _spatial_weighted_rmse(obj1, obj2, lon, lat, centralise=False)
+    return _spatial_weighted.SpatialWeighted(obj1, lon_name, lat_name, weights).rmse(
+        obj2, centralise=False, **kwargs
+    )
 
 
 def spatial_weighted_crmse(
-    obj1: xr.Dataset | xr.DataArray,
-    obj2: xr.Dataset | xr.DataArray,
-    lon: str | None = None,
-    lat: str | None = None,
+    obj1: xr.DataArray | xr.Dataset,
+    obj2: xr.DataArray | xr.Dataset,
+    lon_name: Hashable | None = None,
+    lat_name: Hashable | None = None,
+    weights: xr.DataArray | None = None,
+    **kwargs: Any,
 ) -> xr.Dataset | xr.DataArray:
     """
     Calculate spatial crmse with latitude weighting.
 
     Parameters
     ----------
-    obj1, obj2: xr.Dataset or xr.DataArray
+    obj1, obj2: DataArray or Dataset
         Input data
     lon, lat: str, optional
         Name of longitude/latitude coordinate
+    weights: DataArray, optional
+        Weights to apply (default is cosine of latitude)
 
     Returns
     -------
-    reduced object
+    DataArray or Dataset
+        Reduced object
     """
-    return _spatial_weighted_rmse(obj1, obj2, lon, lat, centralise=True)
+    return _spatial_weighted.SpatialWeighted(obj1, lon_name, lat_name, weights).rmse(
+        obj2, centralise=True, **kwargs
+    )
 
 
 def spatial_weighted_corr(
-    obj1: xr.Dataset | xr.DataArray,
-    obj2: xr.Dataset | xr.DataArray,
-    lon: str | None = None,
-    lat: str | None = None,
+    obj1: xr.DataArray | xr.Dataset,
+    obj2: xr.DataArray | xr.Dataset,
+    lon_name: Hashable | None = None,
+    lat_name: Hashable | None = None,
+    weights: xr.DataArray | None = None,
+    **kwargs: Any,
 ) -> xr.Dataset | xr.DataArray:
     """
     Calculate spatial correlation with latitude weighting.
@@ -335,26 +340,26 @@ def spatial_weighted_corr(
         Input data
     lon, lat: str, optional
         Name of longitude/latitude coordinate
+    weights: DataArray, optional
+        Weights to apply (default is cosine of latitude)
 
     Returns
     -------
-    reduced object
+    DataArray or Dataset
+        Reduced object
     """
-    lon, lat = utils._get_lon_and_lat(obj1, lon, lat)
-    with xr.set_options(keep_attrs=True):  # type: ignore[no-untyped-call]
-        weights = _spatial_weights(obj1, lon, lat)
-        obj1c = obj1 - spatial_weighted_mean(obj1)
-        obj2c = obj2 - spatial_weighted_mean(obj2)
-        num = (obj1c * obj2c).weighted(weights).mean((lon, lat))
-        den = spatial_weighted_std(obj1) * spatial_weighted_std(obj2)
-        return num / den
+    return _spatial_weighted.SpatialWeighted(obj1, lon_name, lat_name, weights).corr(
+        obj2, **kwargs
+    )
 
 
 def spatial_weighted_errors(
-    obj1: xr.Dataset | xr.DataArray,
-    obj2: xr.Dataset | xr.DataArray,
-    lon: str | None = None,
-    lat: str | None = None,
+    obj1: xr.DataArray | xr.Dataset,
+    obj2: xr.DataArray | xr.Dataset,
+    lon_name: Hashable | None = None,
+    lat_name: Hashable | None = None,
+    weights: xr.DataArray | None = None,
+    **kwargs: Any,
 ) -> xr.Dataset | xr.DataArray:
     """
     Calculate rmse, crmse, and correlation with latitude weighting.
@@ -365,76 +370,49 @@ def spatial_weighted_errors(
         Input data
     lon, lat: str, optional
         Name of longitude/latitude coordinate
+    weights: DataArray, optional
+        Weights to apply (default is cosine of latitude)
 
     Returns
     -------
-    reduced object
+    DataArray or Dataset
+        Reduced object
     """
+    sw = _spatial_weighted.SpatialWeighted(obj1, lon_name, lat_name, weights)
     objects = []
-    for func in (spatial_weighted_rmse, spatial_weighted_crmse, spatial_weighted_corr):
-        objects.append(
-            func(obj1, obj2, lon, lat).expand_dims(
-                diagnostic=[func.__name__.replace("spatial_weighted_", "")]
-            )
-        )
+    for func in ("rmse", "crmse", "corr"):
+        if func.endswith("rmse"):
+            centralise = True if func.startswith("c") else False
+            obj = sw.rmse(obj2, centralise=centralise, **kwargs)
+        else:
+            obj = getattr(sw, func)(obj2, **kwargs)
+        objects.append(obj.expand_dims(diagnostic=[func]))
     ds = xr.merge(objects)
-    if isinstance(obj1, xr.DataArray):
-        return ds[obj1.name]
-    return ds
-
-
-def _poly_area(lon_bounds, lat_bounds, geod):  # type: ignore  # TODO: add typing
-    if len(lon_bounds) == len(lat_bounds) == 2:
-        lon_bounds = sorted(lon_bounds) + sorted(lon_bounds, reverse=True)
-        lat_bounds = [lat for lat in lat_bounds for _ in range(2)]
-    polygon = shapely.Polygon(zip(lon_bounds, lat_bounds))
-    return abs(geod.geometry_area_perimeter(polygon)[0])
-
-
-@cacholote.cacheable
-def _cached_grid_cell_area(
-    lon_bounds: dict[str, Any],
-    lat_bounds: dict[str, Any],
-    bounds_dim: set[str],
-    geod: pyproj.Geod,
-) -> xr.Dataset:
-    area = xr.apply_ufunc(
-        _poly_area,
-        xr.DataArray.from_dict(lon_bounds),
-        xr.DataArray.from_dict(lat_bounds),
-        input_core_dims=[tuple(bounds_dim) for _ in range(2)],
-        kwargs={"geod": geod},
-        vectorize=True,
-    )
-    area.attrs["standard_name"] = "cell_area"
-    cf_area: xr.DataArray = area.cf.add_canonical_attributes()
-    return cf_area.to_dataset(name="cell_area")
+    return ds[obj1.name] if isinstance(obj1, xr.DataArray) else ds
 
 
 def grid_cell_area(
-    obj: xr.Dataset | xr.DataArray, geod: pyproj.Geod = pyproj.Geod(ellps="WGS84")
+    obj: DataWithCoords, geod: pyproj.Geod = pyproj.Geod(ellps="WGS84")
 ) -> xr.DataArray:
     """
     Calculate the area of a cell, in meters^2, on a lat/lon grid.
 
     Parameters
     ----------
-    obj: xr.Dataset or xr.DataArray
+    obj: DataArray or Dataset
         Input object with coordinates
     geod: pyproj.Geod
         Projection (default is WGS84)
 
     Returns
     -------
-    xr.DataArray
+    DataArray
         Grid cell area
     """
-    bounds = []
-    bounds_dim = set()
-    for coord in ("longitude", "latitude"):
-        if coord not in obj.cf.bounds:
-            obj = obj.cf.add_bounds(coord)
-        da = obj.cf.get_bounds(coord)
-        bounds_dim.update(set(da.dims) - set(obj.cf[coord].dims))
-        bounds.append(da.to_dict())
-    return _cached_grid_cell_area(bounds[0], bounds[1], bounds_dim, geod)["cell_area"]
+    ds = obj if isinstance(obj, xr.Dataset) else obj.to_dataset(name=obj.name or "None")
+    ds = ds.cf.add_bounds({"longitude", "latitude"} - set(ds.cf.bounds))
+    return _grid_cell_area.cached_grid_cell_area(
+        ds.cf.get_bounds("longitude").to_dict(),
+        ds.cf.get_bounds("latitude").to_dict(),
+        geod,
+    )["cell_area"]
