@@ -482,7 +482,7 @@ def download_and_transform(
     -------
     xr.Dataset
     """
-    download_and_transform = functools.partial(
+    func = functools.partial(
         _download_and_transform_requests,
         collection_id=collection_id,
         transform_func=transform_func,
@@ -507,13 +507,13 @@ def download_and_transform(
         if not transform_chunks or not use_cache:
             with cacholote.config.set(return_cache_entry=False):
                 # Cache final dataset transformed
-                ds = download_and_transform(request_list=request_list)
+                ds = func(request_list=request_list)
         else:
             with cacholote.config.set(return_cache_entry=True):
                 # Cache each chunk transformed
                 sources = []
                 for request in tqdm.tqdm(request_list):
-                    cache_entry = download_and_transform(request_list=[request])
+                    cache_entry = func(request_list=[request])
                     sources.append(cache_entry.result["args"][0]["href"])
                 open_mfdataset_kwargs.pop("preprocess", None)  # Already preprocessed
                 ds = xr.open_mfdataset(sources, **open_mfdataset_kwargs)
