@@ -477,6 +477,7 @@ def download_and_transform(
     with cacholote.config.set(use_cache=use_cache):
         if not transform_chunks or not use_cache:
             with cacholote.config.set(return_cache_entry=False):
+                # Cache final dataset transformed
                 ds = _download_and_transform_requests(
                     collection_id,
                     request_list,
@@ -486,6 +487,7 @@ def download_and_transform(
                 )
         else:
             with cacholote.config.set(return_cache_entry=True):
+                # Cache each chunk transformed
                 sources = []
                 for request in tqdm.tqdm(request_list):
                     cache_entry = _download_and_transform_requests(
