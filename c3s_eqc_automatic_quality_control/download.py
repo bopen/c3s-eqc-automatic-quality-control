@@ -447,7 +447,7 @@ def download_and_transform(
     transform_func: Callable[..., xr.Dataset] | None = None,
     transform_func_kwargs: dict[str, Any] = {},
     transform_chunks: bool = True,
-    n_jobs: bool | None = None,
+    n_jobs: int | None = None,
     **open_mfdataset_kwargs: Any,
 ) -> xr.Dataset:
     """
@@ -473,7 +473,7 @@ def download_and_transform(
         Kwargs to be passed on to `transform_func`
     transform_chunks: bool
         Whether to transform and cache each chunk or the whole dataset
-    n_jobs: bool, optional
+    n_jobs: int, optional
         Number of jobs for parallel download (download everything first)
     **open_mfdataset_kwargs:
         Kwargs to be passed on to xr.open_mfdataset
