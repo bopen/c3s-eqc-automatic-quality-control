@@ -34,13 +34,6 @@ import pandas as pd
 import tqdm
 import xarray as xr
 
-from . import dashboard
-
-cads_toolbox.config.USE_CACHE = True
-
-LOGGER = dashboard.get_logger()
-
-
 # In the future, this kwargs should somehow be handle upstream by the toolbox.
 TO_XARRAY_KWARGS: dict[str, Any] = {
     "pandas_read_csv_kwargs": {"comment": "#"},
@@ -300,7 +293,13 @@ def get_sources(
     source: set[str] = set()
 
     for request in request_list if len(request_list) == 1 else tqdm.tqdm(request_list):
-        data = cads_toolbox.catalogue.retrieve(collection_id, request).data
+        original_use_cache = cads_toolbox.config.USE_CACHE
+        try:
+            with cacholote.config.set(use_cache=True, return_cache_entry=False):
+                cads_toolbox.config.USE_CACHE = True
+                data = cads_toolbox.catalogue.retrieve(collection_id, request).data
+        finally:
+            cads_toolbox.config.USE_CACHE = original_use_cache
         if content := getattr(data, "_content", None):
             source.update(map(str, content))
         else:
@@ -378,6 +377,7 @@ def get_data(source: list[str]) -> Any:
     return emohwak_dir
 
 
+@cacholote.cacheable
 def _download_and_transform_requests(
     collection_id: str,
     request_list: list[dict[str, Any]],
@@ -385,51 +385,48 @@ def _download_and_transform_requests(
     transform_func_kwargs: dict[str, Any],
     **open_mfdataset_kwargs: Any,
 ) -> xr.Dataset:
-    with cacholote.config.set(return_cache_entry=False):
-        # TODO: Ideally, we would always use emohawk.
-        # However, there is not a consistent behavior across backends.
-        # For example, GRIB silently ignore open_mfdataset_kwargs
-        sources = get_sources(collection_id, request_list)
-        try:
-            engine = open_mfdataset_kwargs.get(
-                "engine",
-                {xr.backends.plugins.guess_engine(source) for source in sources},
-            )
-            use_emohawk = len(engine) != 1
-        except ValueError:
-            use_emohawk = True
-
-        open_mfdataset_kwargs["preprocess"] = functools.partial(
-            _preprocess,
-            collection_id=collection_id,
-            preprocess=open_mfdataset_kwargs.get("preprocess", None),
+    # TODO: Ideally, we would always use emohawk.
+    # However, there is not a consistent behavior across backends.
+    # For example, GRIB silently ignore open_mfdataset_kwargs
+    sources = get_sources(collection_id, request_list)
+    try:
+        engine = open_mfdataset_kwargs.get(
+            "engine",
+            {xr.backends.plugins.guess_engine(source) for source in sources},
         )
+        use_emohawk = len(engine) != 1
+    except ValueError:
+        use_emohawk = True
 
-        if use_emohawk:
-            data = get_data(sources)
-            ds: xr.Dataset = data.to_xarray(
-                xarray_open_mfdataset_kwargs=open_mfdataset_kwargs,
-                **TO_XARRAY_KWARGS,
+    open_mfdataset_kwargs["preprocess"] = functools.partial(
+        _preprocess,
+        collection_id=collection_id,
+        preprocess=open_mfdataset_kwargs.get("preprocess", None),
+    )
+
+    if use_emohawk:
+        data = get_data(sources)
+        ds: xr.Dataset = data.to_xarray(
+            xarray_open_mfdataset_kwargs=open_mfdataset_kwargs,
+            **TO_XARRAY_KWARGS,
+        )
+        if not isinstance(ds, xr.Dataset):
+            # When emohawk fails to concat, it silently return a list
+            raise TypeError(f"`emohawk` returned {type(ds)} instead of a xr.Dataset")
+    else:
+        ds = xr.open_mfdataset(sources, **open_mfdataset_kwargs)
+
+    if transform_func is not None:
+        ds = transform_func(ds, **transform_func_kwargs)
+        if not isinstance(ds, xr.Dataset):
+            raise TypeError(
+                f"`transform_func` must return a xr.Dataset, while it returned {type(ds)}"
             )
-            if not isinstance(ds, xr.Dataset):
-                # When emohawk fails to concat, it silently return a list
-                raise TypeError(
-                    f"`emohawk` returned {type(ds)} instead of a xr.Dataset"
-                )
-        else:
-            ds = xr.open_mfdataset(sources, **open_mfdataset_kwargs)
 
-        if transform_func is not None:
-            ds = transform_func(ds, **transform_func_kwargs)
-            if not isinstance(ds, xr.Dataset):
-                raise TypeError(
-                    f"`transform_func` must return a xr.Dataset, while it returned {type(ds)}"
-                )
-
-        # TODO: make cacholote add coordinates? Needed to guarantee roundtrip
-        # See: https://docs.xarray.dev/en/stable/user-guide/io.html#coordinates
-        ds.attrs["coordinates"] = " ".join([str(coord) for coord in ds.coords])
-        return ds
+    # TODO: make cacholote add coordinates? Needed to guarantee roundtrip
+    # See: https://docs.xarray.dev/en/stable/user-guide/io.html#coordinates
+    ds.attrs["coordinates"] = " ".join([str(coord) for coord in ds.coords])
+    return ds
 
 
 def download_and_transform(
@@ -472,42 +469,35 @@ def download_and_transform(
     -------
     xr.Dataset
     """
-    download_and_transform_requests = _download_and_transform_requests
-    if is_cached := transform_func is not None:
-        download_and_transform_requests = cacholote.cacheable(
-            download_and_transform_requests
-        )
-
-    # Split requests
     request_list = []
     for request in ensure_list(requests):
         request_list.extend(split_request(request, chunks, split_all))
 
-    if not transform_chunks or not is_cached:
-        ds = download_and_transform_requests(
-            collection_id,
-            request_list,
-            transform_func,
-            transform_func_kwargs,
-            **open_mfdataset_kwargs,
-        )
-    else:
-        # Cache each chunk separately
-        sources = []
-        for request in tqdm.tqdm(request_list):
-            with cacholote.config.set(
-                return_cache_entry=True, raise_all_encoding_errors=True
-            ):
-                cache_entry = download_and_transform_requests(
+    use_cache = transform_func is not None
+    with cacholote.config.set(use_cache=use_cache):
+        if not transform_chunks or not use_cache:
+            with cacholote.config.set(return_cache_entry=False):
+                ds = _download_and_transform_requests(
                     collection_id,
-                    [request],
+                    request_list,
                     transform_func,
                     transform_func_kwargs,
                     **open_mfdataset_kwargs,
                 )
-            sources.append(cache_entry.result["args"][0]["href"])
-        open_mfdataset_kwargs.pop("preprocess", None)  # Already preprocessed
-        ds = xr.open_mfdataset(sources, **open_mfdataset_kwargs)
+        else:
+            with cacholote.config.set(return_cache_entry=True):
+                sources = []
+                for request in tqdm.tqdm(request_list):
+                    cache_entry = _download_and_transform_requests(
+                        collection_id,
+                        [request],
+                        transform_func,
+                        transform_func_kwargs,
+                        **open_mfdataset_kwargs,
+                    )
+                    sources.append(cache_entry.result["args"][0]["href"])
+                open_mfdataset_kwargs.pop("preprocess", None)  # Already preprocessed
+                ds = xr.open_mfdataset(sources, **open_mfdataset_kwargs)
 
     ds.attrs.pop("coordinates", None)
     return ds

@@ -256,7 +256,7 @@ def _infer_legend_dict(da: xr.DataArray) -> dict[str, tuple[COLOR_T, FLAGS_T]]:
 
     assert (
         len(flags) == len(meanings) and 0 <= len(flags) - len(colors) <= 1
-    ), "flags/meanings/colors missmatch"
+    ), "flags/meanings/colors mismatch"
     if len(flags) - len(colors) == 1:
         colors.insert(flags.index(0), "#000000")
 

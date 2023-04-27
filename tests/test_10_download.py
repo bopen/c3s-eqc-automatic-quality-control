@@ -254,7 +254,7 @@ def test_ensure_request_gets_cached() -> None:
         ),
     ],
 )
-def test_donwload_no_transform(
+def test_download_no_transform(
     monkeypatch: pytest.MonkeyPatch,
     chunks: dict[str, int],
     dask_chunks: dict[str, tuple[int, ...]],
@@ -272,7 +272,7 @@ def test_donwload_no_transform(
         (False, {"forecast_reference_time": (2,)}),
     ],
 )
-def test_donwload_and_transform(
+def test_download_and_transform(
     monkeypatch: pytest.MonkeyPatch,
     transform_chunks: bool,
     dask_chunks: dict[str, tuple[int, ...]],
