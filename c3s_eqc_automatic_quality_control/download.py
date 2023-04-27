@@ -511,12 +511,12 @@ def download_and_transform(
         else:
             with cacholote.config.set(return_cache_entry=True):
                 # Cache each chunk transformed
-                sources = []
-                for request in tqdm.tqdm(request_list):
-                    cache_entry = func(request_list=[request])
-                    sources.append(cache_entry.result["args"][0]["href"])
-                open_mfdataset_kwargs.pop("preprocess", None)  # Already preprocessed
-                ds = xr.open_mfdataset(sources, **open_mfdataset_kwargs)
+                sources = [
+                    func(request_list=[request]).result["args"][0]["href"]
+                    for request in tqdm.tqdm(request_list)
+                ]
+            open_mfdataset_kwargs.pop("preprocess", None)  # Already preprocessed
+            ds = xr.open_mfdataset(sources, **open_mfdataset_kwargs)
 
     ds.attrs.pop("coordinates", None)  # Previously added to guarantee roundtrip
     return ds
