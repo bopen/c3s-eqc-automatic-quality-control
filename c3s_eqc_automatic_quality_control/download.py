@@ -482,6 +482,14 @@ def download_and_transform(
     -------
     xr.Dataset
     """
+    download_and_transform = functools.partial(
+        _download_and_transform_requests,
+        collection_id=collection_id,
+        transform_func=transform_func,
+        transform_func_kwargs=transform_func_kwargs,
+        **open_mfdataset_kwargs,
+    )
+
     request_list = []
     for request in ensure_list(requests):
         request_list.extend(split_request(request, chunks, split_all))
@@ -499,28 +507,16 @@ def download_and_transform(
         if not transform_chunks or not use_cache:
             with cacholote.config.set(return_cache_entry=False):
                 # Cache final dataset transformed
-                ds = _download_and_transform_requests(
-                    collection_id,
-                    request_list,
-                    transform_func,
-                    transform_func_kwargs,
-                    **open_mfdataset_kwargs,
-                )
+                ds = download_and_transform(request_list=request_list)
         else:
             with cacholote.config.set(return_cache_entry=True):
                 # Cache each chunk transformed
                 sources = []
                 for request in tqdm.tqdm(request_list):
-                    cache_entry = _download_and_transform_requests(
-                        collection_id,
-                        [request],
-                        transform_func,
-                        transform_func_kwargs,
-                        **open_mfdataset_kwargs,
-                    )
+                    cache_entry = download_and_transform(request_list=[request])
                     sources.append(cache_entry.result["args"][0]["href"])
                 open_mfdataset_kwargs.pop("preprocess", None)  # Already preprocessed
                 ds = xr.open_mfdataset(sources, **open_mfdataset_kwargs)
 
-    ds.attrs.pop("coordinates", None)
+    ds.attrs.pop("coordinates", None)  # Previously added to guarantee roundtrip
     return ds
