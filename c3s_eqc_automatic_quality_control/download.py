@@ -30,9 +30,12 @@ import cads_toolbox
 import cf_xarray  # noqa: F401
 import cgul
 import emohawk.readers.directory
+import joblib
 import pandas as pd
 import tqdm
 import xarray as xr
+
+cads_toolbox.config.USE_CACHE = True
 
 # In the future, this kwargs should somehow be handle upstream by the toolbox.
 TO_XARRAY_KWARGS: dict[str, Any] = {
@@ -285,6 +288,11 @@ def ensure_request_gets_cached(request: dict[str, Any]) -> dict[str, Any]:
     return cacheable_request
 
 
+def _cached_retrieve(collection_id: str, request: dict[str, Any]) -> emohawk.Data:
+    with cacholote.config.set(use_cache=True, return_cache_entry=False):
+        return cads_toolbox.catalogue.retrieve(collection_id, request).data
+
+
 def get_sources(
     collection_id: str,
     request_list: list[dict[str, Any]],
@@ -293,13 +301,7 @@ def get_sources(
     source: set[str] = set()
 
     for request in request_list if len(request_list) == 1 else tqdm.tqdm(request_list):
-        original_use_cache = cads_toolbox.config.USE_CACHE
-        try:
-            with cacholote.config.set(use_cache=True, return_cache_entry=False):
-                cads_toolbox.config.USE_CACHE = True
-                data = cads_toolbox.catalogue.retrieve(collection_id, request).data
-        finally:
-            cads_toolbox.config.USE_CACHE = original_use_cache
+        data = _cached_retrieve(collection_id, request)
         if content := getattr(data, "_content", None):
             source.update(map(str, content))
         else:
@@ -429,6 +431,14 @@ def _download_and_transform_requests(
     return ds
 
 
+@joblib.delayed  # type: ignore[misc]
+def _delayed_download(
+    collection_id: str, request: dict[str, Any], config: cacholote.config.Settings
+) -> None:
+    with cacholote.config.set(**dict(config)):
+        _cached_retrieve(collection_id, request)
+
+
 def download_and_transform(
     collection_id: str,
     requests: list[dict[str, Any]] | dict[str, Any],
@@ -437,6 +447,7 @@ def download_and_transform(
     transform_func: Callable[..., xr.Dataset] | None = None,
     transform_func_kwargs: dict[str, Any] = {},
     transform_chunks: bool = True,
+    n_jobs: bool | None = None,
     **open_mfdataset_kwargs: Any,
 ) -> xr.Dataset:
     """
@@ -462,6 +473,8 @@ def download_and_transform(
         Kwargs to be passed on to `transform_func`
     transform_chunks: bool
         Whether to transform and cache each chunk or the whole dataset
+    n_jobs: bool, optional
+        Number of jobs for parallel download (download everything first)
     **open_mfdataset_kwargs:
         Kwargs to be passed on to xr.open_mfdataset
 
@@ -472,6 +485,14 @@ def download_and_transform(
     request_list = []
     for request in ensure_list(requests):
         request_list.extend(split_request(request, chunks, split_all))
+
+    if n_jobs is not None:
+        # Download all data first in parallel
+        parallel = joblib.Parallel(n_jobs=n_jobs)
+        parallel(
+            _delayed_download(collection_id, request, cacholote.config.get())
+            for request in request_list
+        )
 
     use_cache = transform_func is not None
     with cacholote.config.set(use_cache=use_cache):
