@@ -515,11 +515,7 @@ def download_and_transform(
 
     use_cache = transform_func is not None
     with cacholote.config.set(use_cache=use_cache):
-        if not transform_chunks or not use_cache:
-            with cacholote.config.set(return_cache_entry=False):
-                # Cache final dataset transformed
-                ds = func(request_list=request_list)
-        else:
+        if use_cache and transform_chunks:
             with cacholote.config.set(return_cache_entry=True):
                 # Cache each chunk transformed
                 sources = [
@@ -528,6 +524,10 @@ def download_and_transform(
                 ]
             open_mfdataset_kwargs.pop("preprocess", None)  # Already preprocessed
             ds = xr.open_mfdataset(sources, **open_mfdataset_kwargs)
+        else:
+            with cacholote.config.set(return_cache_entry=False):
+                # Cache final dataset transformed
+                ds = func(request_list=request_list)
 
     ds.attrs.pop("coordinates", None)  # Previously added to guarantee roundtrip
     return ds
