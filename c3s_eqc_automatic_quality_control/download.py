@@ -312,7 +312,7 @@ def get_sources(
     return list(source)
 
 
-def _add_bounds(ds: xr.Dataset) -> xr.Dataset:
+def _set_bound_coords(ds: xr.Dataset) -> xr.Dataset:
     # TODO: cgul should make bounds coordinates
     bounds = set(sum(ds.cf.bounds.values(), []))
     bounds.update(
@@ -331,17 +331,42 @@ def _add_bounds(ds: xr.Dataset) -> xr.Dataset:
     return ds
 
 
-def harmonise(ds: xr.Dataset) -> xr.Dataset:
-    # TODO: additional rules to cgul
-    ds = cgul.harmonise(ds)
+def _set_time_dim(ds: xr.Dataset, collection_id: str) -> xr.Dataset:
+    # Some dataset are missing the time dimension, so they cann not be squeezed
+    cf_time_dims = set(ds.cf.coordinates.get("time", [])) & set(ds.dims)
+    if not ("time" in ds.dims or cf_time_dims):
+        if "forecast_reference_time" in ds.cf:
+            # E.g., ERA5 squeezed
+            ds = ds.cf.expand_dims("forecast_reference_time")
+        elif "time" in ds.variables and len(ds["time"].dims) <= 1:
+            if not ds["time"].dims:
+                ds = ds.expand_dims("time")
+            else:
+                # E.g., satellite-methane
+                ds = ds.swap_dims({ds["time"].dims[0]: "time"})
+        elif collection_id.startswith("satellite-") and "source" in ds.encoding:
+            # E.g., satellite-aerosol-properties
+            ds = ds.expand_dims(source=[pathlib.Path(ds.encoding["source"]).stem])
+    return ds
 
+
+def _set_pressure_coord(ds: xr.Dataset) -> xr.Dataset:
     # Some satellite data have dimension "pressure" but coordinate "pre"
+    # E.g., satellite-carbon-dioxide
     if "pre" in ds.data_vars:
         da = ds["pre"]
         if set(da.dims) == {"pressure"} and "pressure" not in ds.variables:
             ds = ds.assign_coords(pressure=da)
         ds = ds.drop("pre")
+    return ds
 
+
+def harmonise(ds: xr.Dataset, collection_id: str) -> xr.Dataset:
+    ds = cgul.harmonise(ds)
+    # TODO: Various workarounds that cgul should eventually handle
+    ds = _set_pressure_coord(ds)
+    ds = _set_time_dim(ds, collection_id)
+    ds = _set_bound_coords(ds)
     return ds
 
 
@@ -352,21 +377,7 @@ def _preprocess(
 ) -> xr.Dataset:
     if preprocess is not None:
         ds = preprocess(ds)
-
-    ds = harmonise(ds)
-
-    # TODO: workaround: sometimes single timestamps are squeezed
-    cf_time_dims = set(ds.cf.coordinates.get("time", [])) & set(ds.dims)
-    if not ("time" in ds.dims or cf_time_dims):
-        if "forecast_reference_time" in ds.cf:
-            ds = ds.cf.expand_dims("forecast_reference_time")
-        elif "time" in ds:
-            ds = ds.expand_dims("time")
-        elif collection_id.startswith("satellite-") and "source" in ds.encoding:
-            ds = ds.expand_dims(source=[pathlib.Path(ds.encoding["source"]).stem])
-
-    ds = _add_bounds(ds)
-    return ds
+    return harmonise(ds, collection_id)
 
 
 def get_data(source: list[str]) -> Any:
@@ -504,11 +515,7 @@ def download_and_transform(
 
     use_cache = transform_func is not None
     with cacholote.config.set(use_cache=use_cache):
-        if not transform_chunks or not use_cache:
-            with cacholote.config.set(return_cache_entry=False):
-                # Cache final dataset transformed
-                ds = func(request_list=request_list)
-        else:
+        if use_cache and transform_chunks:
             with cacholote.config.set(return_cache_entry=True):
                 # Cache each chunk transformed
                 sources = [
@@ -517,6 +524,10 @@ def download_and_transform(
                 ]
             open_mfdataset_kwargs.pop("preprocess", None)  # Already preprocessed
             ds = xr.open_mfdataset(sources, **open_mfdataset_kwargs)
+        else:
+            with cacholote.config.set(return_cache_entry=False):
+                # Cache final dataset transformed
+                ds = func(request_list=request_list)
 
     ds.attrs.pop("coordinates", None)  # Previously added to guarantee roundtrip
     return ds
