@@ -17,7 +17,8 @@ This module offers plot functions to visualise diagnostic results.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import warnings
-from typing import Any, Hashable, Iterable
+from collections.abc import Hashable, Iterable
+from typing import Any
 
 import cartopy.crs as ccrs
 import matplotlib.colors

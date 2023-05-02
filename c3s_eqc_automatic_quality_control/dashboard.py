@@ -100,7 +100,7 @@ def get_most_recent_log(info: list[dict[Any, Any]]) -> dict[Any, Any]:
 
 
 def update_from_logfile(logfile: pathlib.Path, info: dict[Any, Any]) -> dict[Any, Any]:
-    with open(logfile, "r", encoding="utf-8") as f:
+    with open(logfile, encoding="utf-8") as f:
         # get only last matched line
         status = None
         for line in f:
