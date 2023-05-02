@@ -228,9 +228,9 @@ def projected_map(
             for stat in "min", "max":
                 dataarrays.append(getattr(da, stat)().expand_dims(diagnostic=[stat]))
             da_stats = xr.merge(dataarrays)[da.name]
-            n_characters = max(map(len, da_stats["diagnostic"].values.tolist()))
 
             # Add statistics box
+            n_characters = max(map(len, da_stats["diagnostic"].values.tolist()))
             units = f" [{units}]" if (units := da.attrs.get("units")) else ""
             txt = "\n".join(
                 [
