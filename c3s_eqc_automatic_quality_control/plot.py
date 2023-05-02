@@ -228,12 +228,13 @@ def projected_map(
             for stat in "min", "max":
                 dataarrays.append(getattr(da, stat)().expand_dims(diagnostic=[stat]))
             da_stats = xr.merge(dataarrays)[da.name]
+            n_characters = max(map(len, da_stats["diagnostic"].values.tolist()))
 
             # Add statistics box
             units = f" [{units}]" if (units := da.attrs.get("units")) else ""
             txt = "\n".join(
                 [
-                    f"{k:>10}: {v.squeeze().values:f}{units}"
+                    f"{k:>{n_characters}}: {v.squeeze().values:f}{units}"
                     for k, v in da_stats.groupby("diagnostic")
                 ]
             )
