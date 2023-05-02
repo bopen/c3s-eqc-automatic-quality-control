@@ -332,32 +332,32 @@ def _set_bound_coords(ds: xr.Dataset) -> xr.Dataset:
 
 
 def _set_time_dim(ds: xr.Dataset, collection_id: str) -> xr.Dataset:
-    # Some dataset are missing the time dimension, so they cann not be squeezed
+    # TODO: Some dataset are missing the time dimension, so they can not be squeezed
     cf_time_dims = set(ds.cf.coordinates.get("time", [])) & set(ds.dims)
     if not ("time" in ds.dims or cf_time_dims):
-        if "forecast_reference_time" in ds.cf:
-            # E.g., ERA5 squeezed
-            ds = ds.cf.expand_dims("forecast_reference_time")
-        elif "time" in ds.variables and len(ds["time"].dims) <= 1:
-            if not ds["time"].dims:
-                ds = ds.expand_dims("time")
-            else:
-                # E.g., satellite-methane
-                ds = ds.swap_dims({ds["time"].dims[0]: "time"})
-        elif collection_id.startswith("satellite-") and "source" in ds.encoding:
-            # E.g., satellite-aerosol-properties
-            ds = ds.expand_dims(source=[pathlib.Path(ds.encoding["source"]).stem])
+        for time in ("forecast_reference_time", "time"):
+            if time in ds.variables and len(ds[time].dims) <= 1:
+                if not ds[time].dims:
+                    ds = ds.expand_dims(time)
+                else:
+                    # E.g., satellite-methane
+                    ds = ds.swap_dims({ds[time].dims[0]: time})
+                break
+        else:
+            if collection_id.startswith("satellite-") and "source" in ds.encoding:
+                # E.g., satellite-aerosol-properties
+                ds = ds.expand_dims(source=[pathlib.Path(ds.encoding["source"]).stem])
     return ds
 
 
 def _set_pressure_coord(ds: xr.Dataset) -> xr.Dataset:
-    # Some satellite data have dimension "pressure" but coordinate "pre"
+    # TODO: Some satellite data have dimension "pressure" but coordinate "pre"
     # E.g., satellite-carbon-dioxide
-    if "pre" in ds.data_vars:
+    if "pre" in ds.variables:
         da = ds["pre"]
         if set(da.dims) == {"pressure"} and "pressure" not in ds.variables:
             ds = ds.assign_coords(pressure=da)
-        ds = ds.drop("pre")
+        ds = ds.drop_vars("pre")
     return ds
 
 
@@ -506,9 +506,8 @@ def download_and_transform(
         request_list.extend(split_request(request, chunks, split_all))
 
     if n_jobs is not None:
-        # Download all data first in parallel
-        parallel = joblib.Parallel(n_jobs=n_jobs)
-        parallel(
+        # Download all data in parallel
+        joblib.Parallel(n_jobs=n_jobs)(
             _delayed_download(collection_id, request, cacholote.config.get())
             for request in request_list
         )
@@ -525,9 +524,8 @@ def download_and_transform(
             open_mfdataset_kwargs.pop("preprocess", None)  # Already preprocessed
             ds = xr.open_mfdataset(sources, **open_mfdataset_kwargs)
         else:
-            with cacholote.config.set(return_cache_entry=False):
-                # Cache final dataset transformed
-                ds = func(request_list=request_list)
+            # Cache final dataset transformed
+            ds = func(request_list=request_list)
 
     ds.attrs.pop("coordinates", None)  # Previously added to guarantee roundtrip
     return ds

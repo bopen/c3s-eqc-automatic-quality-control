@@ -1,6 +1,7 @@
 import dataclasses
 import functools
-from typing import Any, Hashable, overload
+from collections.abc import Hashable
+from typing import Any, overload
 
 import xarray as xr
 from xarray.core.weighted import DataArrayWeighted, DatasetWeighted

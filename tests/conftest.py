@@ -1,5 +1,5 @@
 import pathlib
-from typing import Generator
+from collections.abc import Generator
 
 import cacholote
 import pytest

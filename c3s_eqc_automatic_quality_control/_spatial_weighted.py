@@ -1,6 +1,7 @@
 import dataclasses
 import functools
-from typing import Any, Hashable
+from collections.abc import Hashable
+from typing import Any
 
 import numpy as np
 import xarray as xr
@@ -9,10 +10,11 @@ from xarray.core.weighted import DataArrayWeighted, DatasetWeighted
 
 from . import utils
 
-SpatialWeightedKwargs = TypedDict(
-    "SpatialWeightedKwargs",
-    {"lon_name": Hashable, "lat_name": Hashable, "weights": xr.DataArray},
-)
+
+class SpatialWeightedKwargs(TypedDict):
+    lon_name: Hashable
+    lat_name: Hashable
+    weights: xr.DataArray
 
 
 @dataclasses.dataclass
