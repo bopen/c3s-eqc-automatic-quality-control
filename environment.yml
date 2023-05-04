@@ -14,19 +14,24 @@ dependencies:
 - cf-units
 - dask
 - fsspec
-- geopandas
+- joblib
 - libnetcdf != 4.9.1
 - matplotlib
 - netCDF4
+- numpy
 - pip
 - plotly
 - pydantic
 - python-dotenv
 - pyyaml
+- pyproj
 - rich
 - sqlalchemy
+- structlog
 - typer
 - toml
+- tqdm
+- typing_extensions
 - xarray
 - xesmf >= 0.7.0
 - pip:
