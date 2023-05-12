@@ -355,7 +355,7 @@ def spatial_weighted_corr(
 
     Parameters
     ----------
-    obj1, obj2: xr.Dataset or xr.DataArray
+    obj1, obj2: Dataset or DataArray
         Input data
     lon, lat: str, optional
         Name of longitude/latitude coordinate
@@ -388,7 +388,7 @@ def spatial_weighted_errors(
 
     Parameters
     ----------
-    obj1, obj2: xr.Dataset or xr.DataArray
+    obj1, obj2: Dataset or DataArray
         Input data
     lon, lat: str, optional
         Name of longitude/latitude coordinate
