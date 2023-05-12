@@ -159,8 +159,8 @@ def spatial_weighted_mean(
         Name of longitude/latitude coordinate
     weights: DataArray, bool, default: True
         Weights to apply:
-        - True: cosine of latitude
-        - False: do not weights
+        - True: weights are the cosine of the latitude
+        - False: unweighted
         - DataArray: custom weights
 
     Returns
@@ -191,8 +191,8 @@ def spatial_weighted_std(
         Name of longitude/latitude coordinate
     weights: DataArray, bool, default: True
         Weights to apply:
-        - True: cosine of latitude
-        - False: do not weights
+        - True: weights are the cosine of the latitude
+        - False: unweighted
         - DataArray: custom weights
 
     Returns
@@ -223,8 +223,8 @@ def spatial_weighted_median(
         Name of longitude/latitude coordinate
     weights: DataArray, bool, default: True
         Weights to apply:
-        - True: cosine of latitude
-        - False: do not weights
+        - True: weights are the cosine of the latitude
+        - False: unweighted
         - DataArray: custom weights
 
     Returns
@@ -255,8 +255,8 @@ def spatial_weighted_statistics(
         Name of longitude/latitude coordinate
     weights: DataArray, bool, default: True
         Weights to apply:
-        - True: cosine of latitude
-        - False: do not weights
+        - True: weights are the cosine of the latitude
+        - False: unweighted
         - DataArray: custom weights
 
     Returns
@@ -295,8 +295,8 @@ def spatial_weighted_rmse(
         Name of longitude/latitude coordinate
     weights: DataArray, bool, default: True
         Weights to apply:
-        - True: cosine of latitude
-        - False: do not weights
+        - True: weights are the cosine of the latitude
+        - False: unweighted
         - DataArray: custom weights
 
     Returns
@@ -328,8 +328,8 @@ def spatial_weighted_crmse(
         Name of longitude/latitude coordinate
     weights: DataArray, bool, default: True
         Weights to apply:
-        - True: cosine of latitude
-        - False: do not weights
+        - True: weights are the cosine of the latitude
+        - False: unweighted
         - DataArray: custom weights
 
     Returns
@@ -361,8 +361,8 @@ def spatial_weighted_corr(
         Name of longitude/latitude coordinate
     weights: DataArray, bool, default: True
         Weights to apply:
-        - True: cosine of latitude
-        - False: do not weights
+        - True: weights are the cosine of the latitude
+        - False: unweighted
         - DataArray: custom weights
 
     Returns
@@ -394,8 +394,8 @@ def spatial_weighted_errors(
         Name of longitude/latitude coordinate
     weights: DataArray, bool, default: True
         Weights to apply:
-        - True: cosine of latitude
-        - False: do not weights
+        - True: weights are the cosine of the latitude
+        - False: unweighted
         - DataArray: custom weights
 
     Returns
