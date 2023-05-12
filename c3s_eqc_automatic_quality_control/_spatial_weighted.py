@@ -14,7 +14,7 @@ from . import utils
 class SpatialWeightedKwargs(TypedDict):
     lon_name: Hashable
     lat_name: Hashable
-    weights: xr.DataArray
+    weights: xr.DataArray | bool
 
 
 @dataclasses.dataclass
@@ -22,14 +22,14 @@ class SpatialWeighted:
     obj: xr.DataArray | xr.Dataset
     lon_name: Hashable | None
     lat_name: Hashable | None
-    weights: xr.DataArray | None
+    weights: xr.DataArray | bool
 
     @functools.cached_property
     def kwargs(self) -> SpatialWeightedKwargs:
         return SpatialWeightedKwargs(
             lon_name=self.lon.name,
             lat_name=self.lat.name,
-            weights=self.obj_weighted.weights,
+            weights=False if self.weights is False else self.obj_weighted.weights,
         )
 
     @functools.cached_property
@@ -58,11 +58,14 @@ class SpatialWeighted:
         return sorted(map(str, dims))
 
     @functools.cached_property
-    def obj_weighted(self) -> DataArrayWeighted | DatasetWeighted:
-        weights: xr.DataArray = (
-            self.weights if self.weights is not None else np.cos(np.deg2rad(self.lat))
-        )
-        return self.obj.weighted(weights)
+    def obj_weighted(
+        self,
+    ) -> xr.DataArray | xr.Dataset | DataArrayWeighted | DatasetWeighted:
+        if isinstance(self.weights, xr.DataArray):
+            return self.obj.weighted(self.weights)
+        if self.weights is True:
+            return self.obj.weighted(np.cos(np.deg2rad(self.lat)))
+        return self.obj
 
     @utils.keep_attrs
     def reduce(self, func_name: str, **kwargs: Any) -> xr.DataArray | xr.Dataset:

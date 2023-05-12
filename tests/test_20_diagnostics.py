@@ -1,11 +1,16 @@
+from typing import Union
+
 import cacholote
 import numpy as np
 import pyproj
 import pytest
 import sklearn.metrics
 import xarray as xr
+from xarray.core.weighted import DataArrayWeighted, DatasetWeighted
 
 from c3s_eqc_automatic_quality_control import diagnostics
+
+XR_WEIGHTED_OR_NOT = Union[xr.DataArray, xr.Dataset, DataArrayWeighted, DatasetWeighted]
 
 
 @pytest.mark.parametrize(
@@ -15,19 +20,22 @@ from c3s_eqc_automatic_quality_control import diagnostics
         xr.tutorial.open_dataset("era5-2mt-2019-03-uk.grib")["t2m"],
     ],
 )
-def test_spatial_weighted_statistics(obj: xr.DataArray | xr.Dataset) -> None:
-    weighted = obj.weighted(np.cos(np.deg2rad(obj["latitude"])))
+@pytest.mark.parametrize("weights", [True, False])
+def test_spatial_weighted_statistics(
+    obj: xr.DataArray | xr.Dataset, weights: bool
+) -> None:
+    weighted = obj.weighted(np.cos(np.deg2rad(obj["latitude"]))) if weights else obj
 
     expected_mean = weighted.mean(dim=("latitude", "longitude"))
-    actual_mean = diagnostics.spatial_weighted_mean(obj)
+    actual_mean = diagnostics.spatial_weighted_mean(obj, weights=weights)
     xr.testing.assert_equal(actual_mean, expected_mean)
 
     expected_std = weighted.std(dim=("latitude", "longitude"))
-    actual_std = diagnostics.spatial_weighted_std(obj)
+    actual_std = diagnostics.spatial_weighted_std(obj, weights=weights)
     xr.testing.assert_equal(actual_std, expected_std)
 
     expected_median = weighted.quantile(q=0.5, dim=("latitude", "longitude"))
-    actual_median = diagnostics.spatial_weighted_median(obj)
+    actual_median = diagnostics.spatial_weighted_median(obj, weights=weights)
     xr.testing.assert_equal(actual_median, expected_median)
 
     ds = xr.merge(
@@ -38,7 +46,7 @@ def test_spatial_weighted_statistics(obj: xr.DataArray | xr.Dataset) -> None:
         ],
     )
     expected_statistics = ds if isinstance(obj, xr.Dataset) else ds["t2m"]
-    actual_statistics = diagnostics.spatial_weighted_statistics(obj)
+    actual_statistics = diagnostics.spatial_weighted_statistics(obj, weights=weights)
     xr.testing.assert_equal(expected_statistics, actual_statistics)
 
 
@@ -49,33 +57,47 @@ def test_spatial_weighted_statistics(obj: xr.DataArray | xr.Dataset) -> None:
         xr.tutorial.open_dataset("era5-2mt-2019-03-uk.grib")["t2m"],
     ],
 )
-def test_spatial_weighted_errors(obj: xr.DataArray | xr.Dataset) -> None:
-    weights = np.cos(np.deg2rad(obj["latitude"]))
-
+@pytest.mark.parametrize("weights", [True, False])
+def test_spatial_weighted_errors(obj: xr.DataArray | xr.Dataset, weights: bool) -> None:
+    # Define all variables for equations
     obj1 = obj
     obj2 = obj**2
+    diff2 = (obj2 - obj1) ** 2
 
-    mean1 = obj1.weighted(weights).mean(dim=("latitude", "longitude"))
-    mean2 = obj2.weighted(weights).mean(dim=("latitude", "longitude"))
-    std1 = obj1.weighted(weights).std(dim=("latitude", "longitude"))
-    std2 = obj2.weighted(weights).std(dim=("latitude", "longitude"))
+    if weights:
+        da_weights = np.cos(np.deg2rad(obj["latitude"]))
+        obj1_weighted: XR_WEIGHTED_OR_NOT = obj1.weighted(da_weights)
+        obj2_weighted: XR_WEIGHTED_OR_NOT = obj2.weighted(da_weights)
+        diff2_weighted: XR_WEIGHTED_OR_NOT = diff2.weighted(da_weights)
+    else:
+        obj1_weighted = obj1
+        obj2_weighted = obj2
+        diff2_weighted = diff2
 
-    expected_rmse = ((obj2 - obj1) ** 2).weighted(weights).mean(
-        dim=("latitude", "longitude")
-    ) ** 0.5
-    actual_rmse = diagnostics.spatial_weighted_rmse(obj1, obj2)
+    mean1 = obj1_weighted.mean(dim=("latitude", "longitude"))
+    mean2 = obj2_weighted.mean(dim=("latitude", "longitude"))
+    std1 = obj1_weighted.std(dim=("latitude", "longitude"))
+    std2 = obj2_weighted.std(dim=("latitude", "longitude"))
+    diffc2 = ((obj2 - mean2) - (obj1 - mean1)) ** 2
+    prod = (obj1 - mean1) * (obj2 - mean2)
+
+    if weights:
+        diffc2_weighted: XR_WEIGHTED_OR_NOT = diffc2.weighted(da_weights)
+        prod_weighted: XR_WEIGHTED_OR_NOT = prod.weighted(da_weights)
+    else:
+        diffc2_weighted = diffc2
+        prod_weighted = prod
+
+    expected_rmse = diff2_weighted.mean(dim=("latitude", "longitude")) ** 0.5
+    actual_rmse = diagnostics.spatial_weighted_rmse(obj1, obj2, weights=weights)
     xr.testing.assert_equal(expected_rmse, actual_rmse)
 
-    expected_crmse = (((obj2 - mean2) - (obj1 - mean1)) ** 2).weighted(weights).mean(
-        dim=("latitude", "longitude")
-    ) ** 0.5
-    actual_crmse = diagnostics.spatial_weighted_crmse(obj1, obj2)
+    expected_crmse = diffc2_weighted.mean(dim=("latitude", "longitude")) ** 0.5
+    actual_crmse = diagnostics.spatial_weighted_crmse(obj1, obj2, weights=weights)
     xr.testing.assert_equal(expected_crmse, actual_crmse)
 
-    expected_corr = ((obj1 - mean1) * (obj2 - mean2)).weighted(weights).mean(
-        dim=("latitude", "longitude")
-    ) / (std1 * std2)
-    actual_corr = diagnostics.spatial_weighted_corr(obj1, obj2)
+    expected_corr = prod_weighted.mean(dim=("latitude", "longitude")) / (std1 * std2)
+    actual_corr = diagnostics.spatial_weighted_corr(obj1, obj2, weights=weights)
     xr.testing.assert_equal(expected_corr, actual_corr)
 
     ds = xr.merge(
@@ -86,7 +108,7 @@ def test_spatial_weighted_errors(obj: xr.DataArray | xr.Dataset) -> None:
         ],
     )
     expected_errors = ds if isinstance(obj, xr.Dataset) else ds["t2m"]
-    actual_errors = diagnostics.spatial_weighted_errors(obj1, obj2)
+    actual_errors = diagnostics.spatial_weighted_errors(obj1, obj2, weights=weights)
     xr.testing.assert_equal(expected_errors, actual_errors)
 
 
