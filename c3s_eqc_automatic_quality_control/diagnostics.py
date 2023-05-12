@@ -262,7 +262,7 @@ def spatial_weighted_statistics(
     Returns
     -------
     DataArray or Dataset
-        Reduced object
+        Object with mean, std, and median
     """
     sw = _spatial_weighted.SpatialWeighted(obj, lon_name, lat_name, weights)
     objects = []
@@ -401,7 +401,7 @@ def spatial_weighted_errors(
     Returns
     -------
     DataArray or Dataset
-        Reduced object
+        Object with rmse, crmse, and correlation
     """
     sw = _spatial_weighted.SpatialWeighted(obj1, lon_name, lat_name, weights)
     objects = []
