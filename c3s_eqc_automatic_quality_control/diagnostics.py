@@ -145,7 +145,7 @@ def spatial_weighted_mean(
     obj: xr.DataArray | xr.Dataset,
     lon_name: Hashable | None = None,
     lat_name: Hashable | None = None,
-    weights: xr.DataArray | None = None,
+    weights: xr.DataArray | bool = True,
     **kwargs: Any,
 ) -> xr.Dataset | xr.DataArray:
     """
@@ -157,8 +157,11 @@ def spatial_weighted_mean(
         Input data
     lon_name, lat_name: str, optional
         Name of longitude/latitude coordinate
-    weights: DataArray, optional
-        Weights to apply (default is cosine of latitude)
+    weights: DataArray, bool, default: True
+        Weights to apply:
+        - True: cosine of latitude
+        - False: do not weights
+        - DataArray: custom weights
 
     Returns
     -------
@@ -174,7 +177,7 @@ def spatial_weighted_std(
     obj: xr.DataArray | xr.Dataset,
     lon_name: Hashable | None = None,
     lat_name: Hashable | None = None,
-    weights: xr.DataArray | None = None,
+    weights: xr.DataArray | bool = True,
     **kwargs: Any,
 ) -> xr.Dataset | xr.DataArray:
     """
@@ -186,8 +189,11 @@ def spatial_weighted_std(
         Input data
     lon_name, lat_name: str, optional
         Name of longitude/latitude coordinate
-    weights: DataArray, optional
-        Weights to apply (default is cosine of latitude)
+    weights: DataArray, bool, default: True
+        Weights to apply:
+        - True: cosine of latitude
+        - False: do not weights
+        - DataArray: custom weights
 
     Returns
     -------
@@ -203,7 +209,7 @@ def spatial_weighted_median(
     obj: xr.DataArray | xr.Dataset,
     lon_name: Hashable | None = None,
     lat_name: Hashable | None = None,
-    weights: xr.DataArray | None = None,
+    weights: xr.DataArray | bool = True,
     **kwargs: Any,
 ) -> xr.Dataset | xr.DataArray:
     """
@@ -215,8 +221,11 @@ def spatial_weighted_median(
         Input data
     lon_name, lat_name: str, optional
         Name of longitude/latitude coordinate
-    weights: DataArray, optional
-        Weights to apply (default is cosine of latitude)
+    weights: DataArray, bool, default: True
+        Weights to apply:
+        - True: cosine of latitude
+        - False: do not weights
+        - DataArray: custom weights
 
     Returns
     -------
@@ -232,7 +241,7 @@ def spatial_weighted_statistics(
     obj: xr.DataArray | xr.Dataset,
     lon_name: Hashable | None = None,
     lat_name: Hashable | None = None,
-    weights: xr.DataArray | None = None,
+    weights: xr.DataArray | bool = True,
     **kwargs: Any,
 ) -> xr.Dataset | xr.DataArray:
     """
@@ -244,8 +253,11 @@ def spatial_weighted_statistics(
         Input data
     lon_name, lat_name: str, optional
         Name of longitude/latitude coordinate
-    weights: DataArray, optional
-        Weights to apply (default is cosine of latitude)
+    weights: DataArray, bool, default: True
+        Weights to apply:
+        - True: cosine of latitude
+        - False: do not weights
+        - DataArray: custom weights
 
     Returns
     -------
@@ -269,7 +281,7 @@ def spatial_weighted_rmse(
     obj2: xr.DataArray | xr.Dataset,
     lon_name: Hashable | None = None,
     lat_name: Hashable | None = None,
-    weights: xr.DataArray | None = None,
+    weights: xr.DataArray | bool = True,
     **kwargs: Any,
 ) -> xr.Dataset | xr.DataArray:
     """
@@ -281,8 +293,11 @@ def spatial_weighted_rmse(
         Input data
     lon, lat: str, optional
         Name of longitude/latitude coordinate
-    weights: DataArray, optional
-        Weights to apply (default is cosine of latitude)
+    weights: DataArray, bool, default: True
+        Weights to apply:
+        - True: cosine of latitude
+        - False: do not weights
+        - DataArray: custom weights
 
     Returns
     -------
@@ -299,7 +314,7 @@ def spatial_weighted_crmse(
     obj2: xr.DataArray | xr.Dataset,
     lon_name: Hashable | None = None,
     lat_name: Hashable | None = None,
-    weights: xr.DataArray | None = None,
+    weights: xr.DataArray | bool = True,
     **kwargs: Any,
 ) -> xr.Dataset | xr.DataArray:
     """
@@ -311,8 +326,11 @@ def spatial_weighted_crmse(
         Input data
     lon, lat: str, optional
         Name of longitude/latitude coordinate
-    weights: DataArray, optional
-        Weights to apply (default is cosine of latitude)
+    weights: DataArray, bool, default: True
+        Weights to apply:
+        - True: cosine of latitude
+        - False: do not weights
+        - DataArray: custom weights
 
     Returns
     -------
@@ -329,7 +347,7 @@ def spatial_weighted_corr(
     obj2: xr.DataArray | xr.Dataset,
     lon_name: Hashable | None = None,
     lat_name: Hashable | None = None,
-    weights: xr.DataArray | None = None,
+    weights: xr.DataArray | bool = True,
     **kwargs: Any,
 ) -> xr.Dataset | xr.DataArray:
     """
@@ -341,8 +359,11 @@ def spatial_weighted_corr(
         Input data
     lon, lat: str, optional
         Name of longitude/latitude coordinate
-    weights: DataArray, optional
-        Weights to apply (default is cosine of latitude)
+    weights: DataArray, bool, default: True
+        Weights to apply:
+        - True: cosine of latitude
+        - False: do not weights
+        - DataArray: custom weights
 
     Returns
     -------
@@ -359,7 +380,7 @@ def spatial_weighted_errors(
     obj2: xr.DataArray | xr.Dataset,
     lon_name: Hashable | None = None,
     lat_name: Hashable | None = None,
-    weights: xr.DataArray | None = None,
+    weights: xr.DataArray | bool = True,
     **kwargs: Any,
 ) -> xr.Dataset | xr.DataArray:
     """
@@ -371,8 +392,11 @@ def spatial_weighted_errors(
         Input data
     lon, lat: str, optional
         Name of longitude/latitude coordinate
-    weights: DataArray, optional
-        Weights to apply (default is cosine of latitude)
+    weights: DataArray, bool, default: True
+        Weights to apply:
+        - True: cosine of latitude
+        - False: do not weights
+        - DataArray: custom weights
 
     Returns
     -------
