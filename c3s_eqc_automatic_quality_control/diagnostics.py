@@ -291,7 +291,7 @@ def spatial_weighted_rmse(
     ----------
     obj1, obj2: DataArray or Dataset
         Input data
-    lon, lat: str, optional
+    lon_name, lat_name: str, optional
         Name of longitude/latitude coordinate
     weights: DataArray, bool, default: True
         Weights to apply:
@@ -324,7 +324,7 @@ def spatial_weighted_crmse(
     ----------
     obj1, obj2: DataArray or Dataset
         Input data
-    lon, lat: str, optional
+    lon_name, lat_name: str, optional
         Name of longitude/latitude coordinate
     weights: DataArray, bool, default: True
         Weights to apply:
@@ -357,7 +357,7 @@ def spatial_weighted_corr(
     ----------
     obj1, obj2: Dataset or DataArray
         Input data
-    lon, lat: str, optional
+    lon_name, lat_name: str, optional
         Name of longitude/latitude coordinate
     weights: DataArray, bool, default: True
         Weights to apply:
@@ -390,7 +390,7 @@ def spatial_weighted_errors(
     ----------
     obj1, obj2: Dataset or DataArray
         Input data
-    lon, lat: str, optional
+    lon_name, lat_name: str, optional
         Name of longitude/latitude coordinate
     weights: DataArray, bool, default: True
         Weights to apply:
