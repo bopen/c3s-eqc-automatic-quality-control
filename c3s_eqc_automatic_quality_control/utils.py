@@ -74,14 +74,13 @@ def regionalise(
     # Convert longitude
     lon_limits = xr.DataArray([lon_slice.start, lon_slice.stop], dims=lon_name)
     lon_limits = lon_limits.dropna(lon_name)
+    sort = False
     if lon_limits.min() < 0 and obj[lon_name].max() > 180:
         obj[lon_name] = (obj[lon_name] + 180) % 360 - 180
         sort = True
     elif lon_limits.max() > 180 and obj[lon_name].min() < 0:
         obj[lon_name] = obj[lon_name] % 360
         sort = True
-    else:
-        sort = False
     if sort:
         obj = obj.sortby(lon_name)
 
