@@ -64,7 +64,7 @@ class SpatialWeighted:
         if isinstance(self.weights, xr.DataArray):
             return self.obj.weighted(self.weights)
         if self.weights is True:
-            return self.obj.weighted(np.cos(np.deg2rad(self.lat)))
+            return self.obj.weighted(np.abs(np.cos(np.deg2rad(self.lat))))
         return self.obj
 
     @utils.keep_attrs
