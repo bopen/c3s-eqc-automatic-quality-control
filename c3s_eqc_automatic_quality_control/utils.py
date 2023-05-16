@@ -66,6 +66,7 @@ def regionalise(
     -------
     Cutout object
     """
+    obj = obj.copy()
     lon_name = get_coord_name(obj, "longitude") if lon_name is None else lon_name
     lat_name = get_coord_name(obj, "latitude") if lat_name is None else lat_name
     indexers = {lon_name: lon_slice, lat_name: lat_slice}
@@ -73,12 +74,16 @@ def regionalise(
     # Convert longitude
     lon_limits = xr.DataArray([lon_slice.start, lon_slice.stop], dims=lon_name)
     lon_limits = lon_limits.dropna(lon_name)
-    if (lon_limits < 0).any() and (obj[lon_name] >= 0).all():
+    if lon_limits.min() < 0 and obj[lon_name].max() > 180:
         obj[lon_name] = (obj[lon_name] + 180) % 360 - 180
-        obj[lon_name] = obj[lon_name].sortby(lon_name)
-    elif (lon_limits > 180).any() and (obj[lon_name] <= 180).all():
+        sort = True
+    elif lon_limits.max() > 180 and obj[lon_name].min() < 0:
         obj[lon_name] = obj[lon_name] % 360
-        obj[lon_name] = obj[lon_name].sortby(lon_name)
+        sort = True
+    else:
+        sort = False
+    if sort:
+        obj = obj.sortby(lon_name)
 
     # Sort
     for name, slice in indexers.items():
