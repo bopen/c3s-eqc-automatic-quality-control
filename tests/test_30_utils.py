@@ -14,7 +14,7 @@ from c3s_eqc_automatic_quality_control import utils
     ],
 )
 @pytest.mark.parametrize("longitude", [range(-180, 180), range(0, 360)])
-def test_regionalise(
+def test_regionalise_1d(
     longitude: range, lon_slice: slice, lat_slice: slice, lon_out: slice, lat_out: slice
 ) -> None:
     ds = xr.Dataset(
@@ -31,3 +31,30 @@ def test_regionalise(
     ).cf.guess_coord_axis()
     actual = utils.regionalise(ds, lon_slice, lat_slice)
     xr.testing.assert_identical(actual, expected)
+    assert dict(ds.sizes) == {"longitude": 360, "latitude": 181}
+
+
+def test_regionalise_2d() -> None:
+    ds = (
+        xr.merge(
+            xr.broadcast(
+                xr.DataArray(range(-180, 180), dims="x", name="longitude"),
+                xr.DataArray(range(-90, 91), dims="y", name="latitude"),
+            )
+        )
+        .set_coords(("longitude", "latitude"))
+        .cf.guess_coord_axis()
+    )
+    expected = (
+        xr.merge(
+            xr.broadcast(
+                xr.DataArray(range(-150, -140), dims="x", name="longitude"),
+                xr.DataArray(range(0, 10), dims="y", name="latitude"),
+            )
+        )
+        .set_coords(("longitude", "latitude"))
+        .cf.guess_coord_axis()
+    )
+    actual = utils.regionalise(ds, lon_slice=slice(-150, -140), lat_slice=slice(0, 10))
+    xr.testing.assert_identical(actual, expected)
+    assert dict(ds.sizes) == {"x": 360, "y": 181}

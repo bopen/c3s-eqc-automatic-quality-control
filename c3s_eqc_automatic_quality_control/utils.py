@@ -66,10 +66,17 @@ def regionalise(
     -------
     Cutout object
     """
-    obj = obj.copy()
     lon_name = get_coord_name(obj, "longitude") if lon_name is None else lon_name
     lat_name = get_coord_name(obj, "latitude") if lat_name is None else lat_name
-    indexers = {lon_name: lon_slice, lat_name: lat_slice}
+    if len(obj[lon_name].dims) > 1 or len(obj[lat_name].dims) > 1:
+        # Curvilinear grid
+        mask = (
+            (obj[lon_name] >= lon_slice.start)
+            & (obj[lon_name] < lon_slice.stop)
+            & (obj[lat_name] >= lat_slice.start)
+            & (obj[lat_name] < lat_slice.stop)
+        )
+        return obj.where(mask.compute(), drop=True)
 
     # Convert longitude
     lon_limits = xr.DataArray([lon_slice.start, lon_slice.stop], dims=lon_name)
@@ -85,6 +92,7 @@ def regionalise(
         obj = obj.sortby(lon_name)
 
     # Sort
+    indexers = {lon_name: lon_slice, lat_name: lat_slice}
     for name, slice in indexers.items():
         bounds = obj[name][[0, -1]]
         ascending_bounds = bool(bounds.diff(name) > 0)
