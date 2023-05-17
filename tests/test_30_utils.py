@@ -48,8 +48,8 @@ def test_regionalise_2d() -> None:
     expected = (
         xr.merge(
             xr.broadcast(
-                xr.DataArray(range(-150, -140), dims="x", name="longitude"),
-                xr.DataArray(range(0, 10), dims="y", name="latitude"),
+                xr.DataArray(range(-150, -139), dims="x", name="longitude"),
+                xr.DataArray(range(0, 11), dims="y", name="latitude"),
             )
         )
         .set_coords(("longitude", "latitude"))

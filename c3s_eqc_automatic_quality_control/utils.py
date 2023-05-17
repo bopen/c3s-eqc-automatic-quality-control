@@ -72,9 +72,9 @@ def regionalise(
         # Curvilinear grid
         mask = (
             (obj[lon_name] >= lon_slice.start)
-            & (obj[lon_name] < lon_slice.stop)
+            & (obj[lon_name] <= lon_slice.stop)
             & (obj[lat_name] >= lat_slice.start)
-            & (obj[lat_name] < lat_slice.stop)
+            & (obj[lat_name] <= lat_slice.stop)
         )
         return obj.where(mask.compute(), drop=True)
 
