@@ -33,6 +33,10 @@ def cached_regridder(
     method: str,
     **kwargs: Any
 ) -> xe.Regridder:
+    if isinstance(grid_in, xr.Dataset):
+        # Remove bounds attributes, they can generate conflicts
+        for var in sum(grid_in.cf.bounds.values(), []):
+            grid_in[var].attrs = {}
     dict_in = grid_to_dict(grid_in)
     dict_out = grid_to_dict(grid_out)
     with cacholote.config.set(return_cache_entry=True, io_delete_original=True):
