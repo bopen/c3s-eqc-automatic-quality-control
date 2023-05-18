@@ -290,3 +290,34 @@ def test_download_and_transform(
     )
     assert dict(ds.chunks) == dask_chunks
     assert ds["t2m"].values.tolist() == [281.75, 280.75]
+
+
+@pytest.mark.parametrize("transform_chunks", [True, False])
+@pytest.mark.parametrize("invalidate_cache", [True, False])
+def test_invalidate_cache(
+    monkeypatch: pytest.MonkeyPatch, transform_chunks: bool, invalidate_cache: bool
+) -> None:
+    monkeypatch.setattr(cads_toolbox.catalogue, "_download", mock_download)
+
+    def transform_func(ds: xr.Dataset) -> xr.Dataset:
+        return ds * 0
+
+    ds0 = download.download_and_transform(
+        *AIR_TEMPERATURE_REQUEST,
+        chunks={"time": 1},
+        transform_chunks=transform_chunks,
+        transform_func=transform_func,
+    )
+
+    def transform_func(ds: xr.Dataset) -> xr.Dataset:  # type: ignore[no-redef]
+        return ds * 1
+
+    ds1 = download.download_and_transform(
+        *AIR_TEMPERATURE_REQUEST,
+        chunks={"time": 1},
+        transform_chunks=transform_chunks,
+        transform_func=transform_func,
+        invalidate_cache=invalidate_cache,
+    )
+
+    assert ds0.identical(ds1) is not invalidate_cache

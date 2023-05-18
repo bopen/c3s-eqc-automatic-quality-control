@@ -459,6 +459,7 @@ def download_and_transform(
     transform_func_kwargs: dict[str, Any] = {},
     transform_chunks: bool = True,
     n_jobs: int | None = None,
+    invalidate_cache: bool = False,
     **open_mfdataset_kwargs: Any,
 ) -> xr.Dataset:
     """
@@ -486,6 +487,8 @@ def download_and_transform(
         Whether to transform and cache each chunk or the whole dataset
     n_jobs: int, optional
         Number of jobs for parallel download (download everything first)
+    invalidate_cache: False
+        Whether to invalidate the cache entry or not
     **open_mfdataset_kwargs:
         Kwargs to be passed on to xr.open_mfdataset
 
@@ -515,16 +518,25 @@ def download_and_transform(
     use_cache = transform_func is not None
     with cacholote.config.set(use_cache=use_cache):
         if use_cache and transform_chunks:
-            with cacholote.config.set(return_cache_entry=True):
-                # Cache each chunk transformed
-                sources = [
-                    func(request_list=[request]).result["args"][0]["href"]
-                    for request in tqdm.tqdm(request_list)
-                ]
+            # Cache each chunk transformed
+            sources = []
+            for request in tqdm.tqdm(request_list):
+                if invalidate_cache:
+                    cacholote.delete(
+                        func.func, *func.args, request_list=[request], **func.keywords
+                    )
+                with cacholote.config.set(return_cache_entry=True):
+                    sources.append(
+                        func(request_list=[request]).result["args"][0]["href"]
+                    )
             open_mfdataset_kwargs.pop("preprocess", None)  # Already preprocessed
             ds = xr.open_mfdataset(sources, **open_mfdataset_kwargs)
         else:
             # Cache final dataset transformed
+            if invalidate_cache:
+                cacholote.delete(
+                    func.func, *func.args, request_list=request_list, **func.keywords
+                )
             ds = func(request_list=request_list)
 
     ds.attrs.pop("coordinates", None)  # Previously added to guarantee roundtrip
