@@ -38,6 +38,7 @@ import xarray as xr
 cads_toolbox.config.USE_CACHE = True
 
 # In the future, this kwargs should somehow be handle upstream by the toolbox.
+INVALIDATE_CACHE = False
 TO_XARRAY_KWARGS: dict[str, Any] = {
     "pandas_read_csv_kwargs": {"comment": "#"},
 }
@@ -459,7 +460,7 @@ def download_and_transform(
     transform_func_kwargs: dict[str, Any] = {},
     transform_chunks: bool = True,
     n_jobs: int | None = None,
-    invalidate_cache: bool = False,
+    invalidate_cache: bool | None = None,
     **open_mfdataset_kwargs: Any,
 ) -> xr.Dataset:
     """
@@ -487,8 +488,9 @@ def download_and_transform(
         Whether to transform and cache each chunk or the whole dataset
     n_jobs: int, optional
         Number of jobs for parallel download (download everything first)
-    invalidate_cache: False
-        Whether to invalidate the cache entry or not
+    invalidate_cache: bool, optional
+        Whether to invalidate the cache entry or not.
+        If None, use global variable INVALIDATE_CACHE
     **open_mfdataset_kwargs:
         Kwargs to be passed on to xr.open_mfdataset
 
@@ -496,6 +498,9 @@ def download_and_transform(
     -------
     xr.Dataset
     """
+    if invalidate_cache is None:
+        invalidate_cache = INVALIDATE_CACHE
+
     func = functools.partial(
         _download_and_transform_requests,
         collection_id=collection_id,
