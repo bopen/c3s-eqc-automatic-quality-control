@@ -175,6 +175,7 @@ def projected_map(
     da: xr.DataArray,
     projection: ccrs.Projection = ccrs.PlateCarree(),
     show_stats: bool | None = None,
+    stats_weights: xr.DataArray | bool = True,
     plot_func: str | None = None,
     **kwargs: Any,
 ) -> GeoQuadMesh | FacetGrid[Any]:
@@ -188,6 +189,8 @@ def projected_map(
         Projection for the plot
     show_stats: bool, optional
         Whether to show or not a box with statistics
+    stats_weights: bool, DataArray
+        `weights` argument from diagnostics.spatial_weighted_statistics
     plot_func: str, optional
         Plotting function (e.g., pcolormesh, contourf, ...)
     **kwargs:
@@ -224,7 +227,9 @@ def projected_map(
 
         # Compute statistics
         if (show_stats is None) or show_stats:
-            dataarrays = [diagnostics.spatial_weighted_statistics(da)]
+            dataarrays = [
+                diagnostics.spatial_weighted_statistics(da, weights=stats_weights)
+            ]
             for stat in "min", "max":
                 dataarrays.append(getattr(da, stat)().expand_dims(diagnostic=[stat]))
             da_stats = xr.merge(dataarrays)[da.name]
