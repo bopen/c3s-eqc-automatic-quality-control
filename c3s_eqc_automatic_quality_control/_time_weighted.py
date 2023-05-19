@@ -13,10 +13,10 @@ from . import utils
 class TimeWeighted:
     obj: xr.DataArray | xr.Dataset
     time_name: Hashable | None
-    weights: xr.DataArray | None
+    weights: xr.DataArray | bool
 
     def __post_init__(self) -> None:
-        if self.weights is None:
+        if self.weights is True:
             self.obj = self.obj.convert_calendar(
                 "noleap",
                 align_on="date",
@@ -39,11 +39,14 @@ class TimeWeighted:
 
     @functools.cached_property
     @utils.keep_attrs
-    def obj_weighted(self) -> DataArrayWeighted | DatasetWeighted:
-        weights = (
-            self.weights if self.weights is not None else self.time.dt.days_in_month
-        )
-        return self.obj.weighted(weights)
+    def obj_weighted(
+        self,
+    ) -> xr.DataArray | xr.Dataset | DataArrayWeighted | DatasetWeighted:
+        if isinstance(self.weights, xr.DataArray):
+            return self.obj.weighted(self.weights)
+        if self.weights is True:
+            return self.obj.weighted(self.time.dt.days_in_month)
+        return self.obj
 
     @utils.keep_attrs
     def groupby_reduce(
@@ -52,14 +55,17 @@ class TimeWeighted:
         if "." not in group:
             group = ".".join([str(self.time.name), group])
         time_name, *_ = group.split(".", 1)
-        obj = self.obj.assign_coords(__weights__=self.obj_weighted.weights)
+        obj = self.obj
+        if isinstance(self.obj_weighted, (DataArrayWeighted | DatasetWeighted)):
+            obj = obj.assign_coords(__weights__=self.obj_weighted.weights)
         return obj.groupby(group).map(map_func, (time_name, func_name), **kwargs)
 
     @utils.keep_attrs
     def reduce(
         self, func_name: str, group: str | None = None, **kwargs: Any
     ) -> xr.DataArray | xr.Dataset:
-        kwargs.setdefault("dim", self.obj_weighted.weights.dims)
+        if "dim" not in kwargs:
+            kwargs["dim"] = self.time.name
 
         if group is not None:
             return self.groupby_reduce(func_name, group, **kwargs)
@@ -93,6 +99,7 @@ def map_func(
     func: str,
     **kwargs: Any,
 ) -> xr.DataArray | xr.Dataset:
-    weights = xr.DataArray(grouped_obj["__weights__"])
-    grouped_obj = grouped_obj.drop_vars("__weights__")
+    weights = grouped_obj.coords.get("__weights__", False)
+    if weights is not False:
+        grouped_obj = grouped_obj.drop_vars("__weights__")
     return TimeWeighted(grouped_obj, time_name, weights).reduce(func, **kwargs)

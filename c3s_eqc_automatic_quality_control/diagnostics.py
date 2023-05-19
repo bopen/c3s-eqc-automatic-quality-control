@@ -60,7 +60,7 @@ def regrid(
 def time_weighted_mean(
     obj: xr.DataArray | xr.Dataset,
     time_name: Hashable | None = None,
-    weights: xr.DataArray | None = None,
+    weights: xr.DataArray | bool = True,
     **kwargs: Any,
 ) -> xr.DataArray | xr.Dataset:
     """
@@ -70,10 +70,13 @@ def time_weighted_mean(
     ----------
     obj: DataArray or Dataset
         Input data
-    time_name: hashable, optional
+    time_name: str, optional
         Name of time coordinate
-    weights: DataArray, optional
-        Weights to apply (default is days per month)
+    weights: DataArray, bool, default: True
+        Weights to apply:
+        - True: weights are the number of days in each month
+        - False: unweighted
+        - DataArray: custom weights
 
     Returns
     -------
@@ -85,10 +88,41 @@ def time_weighted_mean(
     )
 
 
+def time_weighted_std(
+    obj: xr.DataArray | xr.Dataset,
+    time_name: Hashable | None = None,
+    weights: xr.DataArray | bool = True,
+    **kwargs: Any,
+) -> xr.DataArray | xr.Dataset:
+    """
+    Calculate time weighted std.
+
+    Parameters
+    ----------
+    obj: DataArray or Dataset
+        Input data
+    time_name: str, optional
+        Name of time coordinate
+    weights: DataArray, bool, default: True
+        Weights to apply:
+        - True: weights are the number of days in each month
+        - False: unweighted
+        - DataArray: custom weights
+
+    Returns
+    -------
+    DataArray or Dataset
+        Reduced object
+    """
+    return _time_weighted.TimeWeighted(obj, time_name, weights).reduce(
+        "std", None, **kwargs
+    )
+
+
 def seasonal_weighted_mean(
     obj: xr.DataArray | xr.Dataset,
     time_name: Hashable | None = None,
-    weights: xr.DataArray | None = None,
+    weights: xr.DataArray | bool = True,
     **kwargs: Any,
 ) -> xr.DataArray | xr.Dataset:
     """
@@ -98,10 +132,13 @@ def seasonal_weighted_mean(
     ----------
     obj: DataArray or Dataset
         Input data
-    time_name: hashable, optional
+    time_name: str, optional
         Name of time coordinate
-    weights: DataArray, optional
-        Weights to apply (default is days per month)
+    weights: DataArray, bool, default: True
+        Weights to apply:
+        - True: weights are the number of days in each month
+        - False: unweighted
+        - DataArray: custom weights
 
     Returns
     -------
@@ -113,10 +150,41 @@ def seasonal_weighted_mean(
     )
 
 
+def seasonal_weighted_std(
+    obj: xr.DataArray | xr.Dataset,
+    time_name: Hashable | None = None,
+    weights: xr.DataArray | bool = True,
+    **kwargs: Any,
+) -> xr.DataArray | xr.Dataset:
+    """
+    Calculate seasonal weighted std.
+
+    Parameters
+    ----------
+    obj: DataArray or Dataset
+        Input data
+    time_name: str, optional
+        Name of time coordinate
+    weights: DataArray, bool, default: True
+        Weights to apply:
+        - True: weights are the number of days in each month
+        - False: unweighted
+        - DataArray: custom weights
+
+    Returns
+    -------
+    DataArray or Dataset
+        Reduced object
+    """
+    return _time_weighted.TimeWeighted(obj, time_name, weights).reduce(
+        "std", "season", **kwargs
+    )
+
+
 def annual_weighted_mean(
     obj: xr.DataArray | xr.Dataset,
     time_name: Hashable | None = None,
-    weights: xr.DataArray | None = None,
+    weights: xr.DataArray | bool = True,
     **kwargs: Any,
 ) -> xr.DataArray | xr.Dataset:
     """
@@ -126,10 +194,13 @@ def annual_weighted_mean(
     ----------
     obj: DataArray or Dataset
         Input data
-    time_name: hashable, optional
+    time_name: str, optional
         Name of time coordinate
-    weights: DataArray, optional
-        Weights to apply (default is days per month)
+    weights: DataArray, bool, default: True
+        Weights to apply:
+        - True: weights are the number of days in each month
+        - False: unweighted
+        - DataArray: custom weights
 
     Returns
     -------
@@ -138,6 +209,37 @@ def annual_weighted_mean(
     """
     return _time_weighted.TimeWeighted(obj, time_name, weights).reduce(
         "mean", "year", **kwargs
+    )
+
+
+def annual_weighted_std(
+    obj: xr.DataArray | xr.Dataset,
+    time_name: Hashable | None = None,
+    weights: xr.DataArray | bool = True,
+    **kwargs: Any,
+) -> xr.DataArray | xr.Dataset:
+    """
+    Calculate annual weighted std.
+
+    Parameters
+    ----------
+    obj: DataArray or Dataset
+        Input data
+    time_name: str, optional
+        Name of time coordinate
+    weights: DataArray, bool, default: True
+        Weights to apply:
+        - True: weights are the number of days in each month
+        - False: unweighted
+        - DataArray: custom weights
+
+    Returns
+    -------
+    DataArray or Dataset
+        Reduced object
+    """
+    return _time_weighted.TimeWeighted(obj, time_name, weights).reduce(
+        "std", "year", **kwargs
     )
 
 
