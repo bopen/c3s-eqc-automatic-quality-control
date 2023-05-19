@@ -26,6 +26,25 @@ from xarray.core.common import DataWithCoords
 
 from . import _grid_cell_area, _regrid, _spatial_weighted, _time_weighted
 
+__all__ = [
+    "annual_weighted_mean",
+    "annual_weighted_std",
+    "grid_cell_area",
+    "regrid",
+    "seasonal_weighted_mean",
+    "seasonal_weighted_std",
+    "spatial_weighted_corr",
+    "spatial_weighted_crmse",
+    "spatial_weighted_errors",
+    "spatial_weighted_mean",
+    "spatial_weighted_median",
+    "spatial_weighted_rmse",
+    "spatial_weighted_statistics",
+    "spatial_weighted_std",
+    "time_weighted_mean",
+    "time_weighted_std",
+]
+
 
 def regrid(
     obj: xr.DataArray | xr.Dataset,

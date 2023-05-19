@@ -1,3 +1,5 @@
+import inspect
+
 import cacholote
 import numpy as np
 import pyproj
@@ -5,6 +7,16 @@ import pytest
 import xarray as xr
 
 from c3s_eqc_automatic_quality_control import diagnostics
+
+
+def test_all() -> None:
+    assert diagnostics.__all__ == sorted(
+        [
+            f[0]
+            for f in inspect.getmembers(diagnostics, inspect.isfunction)
+            if not f[0].startswith("_")
+        ]
+    )
 
 
 @pytest.mark.parametrize(
