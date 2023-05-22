@@ -82,7 +82,7 @@ class TestTimeWeighted:
         else:
             expected = obj.groupby("time.season").mean("time")
         actual = diagnostics.seasonal_weighted_mean(obj, weights=weights)
-        xr.testing.assert_allclose(expected, actual)
+        xr.testing.assert_equal(expected, actual)
 
     def test_seasonal_weighted_std(
         self, obj: xr.DataArray | xr.Dataset, weights: bool
@@ -93,7 +93,7 @@ class TestTimeWeighted:
         else:
             expected = obj.groupby("time.season").std("time")
         actual = diagnostics.seasonal_weighted_std(obj, weights=weights)
-        xr.testing.assert_allclose(expected, actual)
+        xr.testing.assert_equal(expected, actual)
 
     def test_annual_weighted_mean(
         self, obj: xr.DataArray | xr.Dataset, weights: bool
@@ -104,7 +104,7 @@ class TestTimeWeighted:
         else:
             expected = obj.groupby("time.year").mean("time")
         actual = diagnostics.annual_weighted_mean(obj, weights=weights)
-        xr.testing.assert_allclose(expected, actual)
+        xr.testing.assert_equal(expected, actual)
 
     def test_annual_weighted_std(
         self, obj: xr.DataArray | xr.Dataset, weights: bool
@@ -115,7 +115,7 @@ class TestTimeWeighted:
         else:
             expected = obj.groupby("time.year").std("time")
         actual = diagnostics.annual_weighted_std(obj, weights=weights)
-        xr.testing.assert_allclose(expected, actual)
+        xr.testing.assert_equal(expected, actual)
 
     def test_time_weighted_linear_trend(
         self, obj: xr.DataArray | xr.Dataset, weights: bool
@@ -129,8 +129,8 @@ class TestTimeWeighted:
             * 1.0e9
         )
         if isinstance(obj, xr.DataArray):
-            xr.testing.assert_allclose(ds_trend["polyfit_coefficients"], actual)
+            xr.testing.assert_equal(ds_trend["polyfit_coefficients"], actual)
         else:
-            xr.testing.assert_allclose(
+            xr.testing.assert_equal(
                 ds_trend.rename(Tair_polyfit_coefficients="Tair"), actual
             )
