@@ -116,6 +116,9 @@ def time_weighted_linear_trend(
             for var in ds_trend.data_vars
         }
     )
+    for var, da in ds_trend.items():
+        da.attrs["units"] = f"{ds[var].attrs.get('units', '')} s-1"
+        da.attrs["long_name"] = f"Linear trend of {ds[var].attrs.get('long_name', '')}"
     if isinstance(obj, xr.DataArray):
         return ds_trend[obj.name or ""]
     return ds_trend
