@@ -239,7 +239,7 @@ def projected_map(
             units = f" [{units}]" if (units := da.attrs.get("units")) else ""
             txt = "\n".join(
                 [
-                    f"{k:>{n_characters}}: {v.squeeze().values:f}{units}"
+                    f"{k:>{n_characters}}: {v.squeeze().values:e}{units}"
                     for k, v in da_stats.groupby("diagnostic")
                 ]
             )

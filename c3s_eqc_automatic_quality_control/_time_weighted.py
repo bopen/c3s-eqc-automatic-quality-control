@@ -72,6 +72,21 @@ class TimeWeighted:
         obj: xr.DataArray | xr.Dataset = getattr(self.obj_weighted, func_name)(**kwargs)
         return obj
 
+    def polyfit(self, **kwargs: Any) -> xr.DataArray | xr.Dataset:
+        if "w" not in kwargs:
+            kwargs["w"] = (
+                self.obj_weighted.weights
+                if isinstance(self.obj_weighted, (DataArrayWeighted | DatasetWeighted))
+                else None
+            )
+        if "dim" not in kwargs:
+            kwargs["dim"] = self.time.name
+
+        if "w" in kwargs:
+            # TODO: https://github.com/pydata/xarray/issues/5644
+            return self.obj.copy(deep=True).polyfit(**kwargs)
+        return self.obj.polyfit(**kwargs)
+
 
 @overload
 def map_func(

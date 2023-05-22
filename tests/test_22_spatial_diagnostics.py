@@ -33,7 +33,9 @@ class TestSpatialWeighted:
         actual_std = diagnostics.spatial_weighted_std(obj, weights=weights)
         xr.testing.assert_equal(actual_std, expected_std)
 
-        expected_median = weighted.quantile(q=0.5, dim=("latitude", "longitude"))
+        expected_median = weighted.quantile(
+            q=0.5, dim=("latitude", "longitude")
+        ).drop_vars("quantile")
         actual_median = diagnostics.spatial_weighted_median(obj, weights=weights)
         xr.testing.assert_equal(actual_median, expected_median)
 
