@@ -41,6 +41,7 @@ __all__ = [
     "spatial_weighted_rmse",
     "spatial_weighted_statistics",
     "spatial_weighted_std",
+    "time_weighted_linear_trend",
     "time_weighted_mean",
     "time_weighted_std",
 ]
@@ -74,6 +75,50 @@ def regrid(
     regridder = _regrid.cached_regridder(obj, grid_out, method, **kwargs)
     obj = regridder(obj, keep_attrs=True)
     return obj
+
+
+def time_weighted_linear_trend(
+    obj: xr.DataArray | xr.Dataset,
+    time_name: Hashable | None = None,
+    weights: xr.DataArray | bool = True,
+    **kwargs: Any,
+) -> xr.DataArray | xr.Dataset:
+    """
+    Calculate time weighted linear trend.
+
+    Parameters
+    ----------
+    obj: DataArray or Dataset
+        Input data
+    time_name: str, optional
+        Name of time coordinate
+    weights: DataArray, bool, default: True
+        Weights to apply:
+        - True: weights are the number of days in each month
+        - False: unweighted
+        - DataArray: custom weights
+
+    Returns
+    -------
+    DataArray or Dataset
+        Reduced object
+    """
+    ds = obj.to_dataset(name=obj.name or "") if isinstance(obj, xr.DataArray) else obj
+    ds_trend = (
+        _time_weighted.TimeWeighted(ds, time_name, weights)
+        .polyfit(deg=1, **kwargs)
+        .sel(degree=0, drop=True)
+    )
+    ds_trend = ds_trend * 1.0e9  # 1/ns to 1/s
+    ds_trend = ds_trend.rename(
+        {
+            var: str(var).removesuffix("_polyfit_coefficients")
+            for var in ds_trend.data_vars
+        }
+    )
+    if isinstance(obj, xr.DataArray):
+        return ds_trend[obj.name or ""]
+    return ds_trend
 
 
 def time_weighted_mean(
@@ -353,8 +398,8 @@ def spatial_weighted_median(
     DataArray or Dataset
         Reduced object
     """
-    return _spatial_weighted.SpatialWeighted(obj, lon_name, lat_name, weights).reduce(
-        "quantile", q=0.5, **kwargs
+    return _spatial_weighted.SpatialWeighted(obj, lon_name, lat_name, weights).median(
+        **kwargs
     )
 
 
@@ -388,8 +433,8 @@ def spatial_weighted_statistics(
     sw = _spatial_weighted.SpatialWeighted(obj, lon_name, lat_name, weights)
     objects = []
     for func in ("mean", "std", "median"):
-        if func == "median":
-            obj = sw.reduce("quantile", q=0.5, **kwargs)
+        if hasattr(sw, func):
+            obj = getattr(sw, func)(**kwargs)
         else:
             obj = sw.reduce(func, **kwargs)
         objects.append(obj.expand_dims(diagnostic=[func]))

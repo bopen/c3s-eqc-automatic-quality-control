@@ -116,3 +116,21 @@ class TestTimeWeighted:
             expected = obj.groupby("time.year").std("time")
         actual = diagnostics.annual_weighted_std(obj, weights=weights)
         xr.testing.assert_allclose(expected, actual)
+
+    def test_time_weighted_linear_trend(
+        self, obj: xr.DataArray | xr.Dataset, weights: bool
+    ) -> None:
+        actual = diagnostics.time_weighted_linear_trend(obj, weights=weights)
+
+        ds_trend = (
+            obj.polyfit(
+                "time", w=obj["time"].dt.days_in_month if weights else None, deg=1
+            ).sel(degree=0, drop=True)
+            * 1.0e9
+        )
+        if isinstance(obj, xr.DataArray):
+            xr.testing.assert_allclose(ds_trend["polyfit_coefficients"], actual)
+        else:
+            xr.testing.assert_allclose(
+                ds_trend.rename(Tair_polyfit_coefficients="Tair"), actual
+            )
