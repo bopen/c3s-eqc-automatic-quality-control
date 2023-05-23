@@ -219,8 +219,8 @@ def time_weighted_coverage(
 
     def update_attrs(da: xr.DataArray, attrs: dict[str, Any]) -> None:
         da.attrs = {
-            "long_name": f"Coverage of {attrs.get('long_name', '')}",
-            "units": "%",
+            "long_name": f"Normalized coverage of {attrs.get('long_name', '')}",
+            "units": "1",
         }
 
     if isinstance(coverage, xr.Dataset):

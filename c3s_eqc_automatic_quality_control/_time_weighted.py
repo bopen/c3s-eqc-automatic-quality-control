@@ -91,14 +91,12 @@ class TimeWeighted:
         if "dim" not in kwargs:
             kwargs["dim"] = self.time.name
         if isinstance(self.obj_weighted, (DataArrayWeighted | DatasetWeighted)):
-            cov = (
+            return (
                 self.obj.notnull()
                 * self.obj_weighted.weights
                 / self.obj_weighted.weights.sum(**kwargs)
             )
-        else:
-            cov = self.obj.count(**kwargs) / self.obj.sizes[kwargs["dim"]]
-        return cov * 100
+        return self.obj.count(**kwargs) / self.obj.sizes[kwargs["dim"]]
 
 
 @overload

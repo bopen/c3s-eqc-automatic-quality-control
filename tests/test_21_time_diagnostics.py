@@ -143,9 +143,8 @@ class TestTimeWeighted:
                 obj.notnull()
                 * obj["time"].dt.days_in_month
                 / obj["time"].dt.days_in_month.sum("time")
-                * 100
             )
         else:
-            expected = obj.count("time") / obj.sizes["time"] * 100
+            expected = obj.count("time") / obj.sizes["time"]
         actual = diagnostics.time_weighted_coverage(obj, weights=weights)
         xr.testing.assert_equal(expected, actual)
