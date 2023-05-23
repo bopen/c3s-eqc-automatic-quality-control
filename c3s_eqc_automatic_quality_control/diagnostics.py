@@ -108,7 +108,7 @@ def time_weighted_linear_trend(
     ds_trend = (
         _time_weighted.TimeWeighted(ds, time_name, weights)
         .polyfit(deg=1, **kwargs)
-        .sel(degree=0, drop=True)
+        .sel(degree=1, drop=True)
     )
     ds_trend = ds_trend * 1.0e9  # 1/ns to 1/s
     ds_trend = ds_trend.rename(

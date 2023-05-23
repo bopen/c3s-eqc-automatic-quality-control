@@ -125,7 +125,7 @@ class TestTimeWeighted:
         ds_trend = (
             obj.polyfit(
                 "time", w=obj["time"].dt.days_in_month if weights else None, deg=1
-            ).sel(degree=0, drop=True)
+            ).sel(degree=1, drop=True)
             * 1.0e9
         )
         if isinstance(obj, xr.DataArray):
