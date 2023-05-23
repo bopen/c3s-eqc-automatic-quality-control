@@ -41,6 +41,7 @@ __all__ = [
     "spatial_weighted_rmse",
     "spatial_weighted_statistics",
     "spatial_weighted_std",
+    "time_weighted_coverage",
     "time_weighted_linear_trend",
     "time_weighted_mean",
     "time_weighted_std",
@@ -117,8 +118,10 @@ def time_weighted_linear_trend(
         }
     )
     for var, da in ds_trend.items():
-        da.attrs["units"] = f"{ds[var].attrs.get('units', '')} s-1"
-        da.attrs["long_name"] = f"Linear trend of {ds[var].attrs.get('long_name', '')}"
+        da.attrs = {
+            "long_name": f"Linear trend of {ds[var].attrs.get('long_name', '')}",
+            "units": f"{ds[var].attrs.get('units', '')} s-1",
+        }
     if isinstance(obj, xr.DataArray):
         return ds_trend[obj.name or ""]
     return ds_trend
@@ -184,6 +187,48 @@ def time_weighted_std(
     return _time_weighted.TimeWeighted(obj, time_name, weights).reduce(
         "std", None, **kwargs
     )
+
+
+def time_weighted_coverage(
+    obj: xr.DataArray | xr.Dataset,
+    time_name: Hashable | None = None,
+    weights: xr.DataArray | bool = True,
+    **kwargs: Any,
+) -> xr.DataArray | xr.Dataset:
+    """
+    Calculate time weighted coverage.
+
+    Parameters
+    ----------
+    obj: DataArray or Dataset
+        Input data
+    time_name: str, optional
+        Name of time coordinate
+    weights: DataArray, bool, default: True
+        Weights to apply:
+        - True: weights are the number of days in each month
+        - False: unweighted
+        - DataArray: custom weights
+
+    Returns
+    -------
+    DataArray or Dataset
+        Reduced object
+    """
+    coverage = _time_weighted.TimeWeighted(obj, time_name, weights).coverage(**kwargs)
+
+    def update_attrs(da: xr.DataArray, attrs: dict[str, Any]) -> None:
+        da.attrs = {
+            "long_name": f"Coverage of {attrs.get('long_name', '')}",
+            "units": "%",
+        }
+
+    if isinstance(coverage, xr.Dataset):
+        for var, da in coverage.data_vars.items():
+            update_attrs(da, obj[var].attrs)
+    else:
+        update_attrs(coverage, obj.attrs)
+    return coverage
 
 
 def seasonal_weighted_mean(

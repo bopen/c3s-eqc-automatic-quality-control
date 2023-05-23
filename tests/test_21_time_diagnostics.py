@@ -134,3 +134,18 @@ class TestTimeWeighted:
             xr.testing.assert_equal(
                 ds_trend.rename(Tair_polyfit_coefficients="Tair"), actual
             )
+
+    def test_time_weighted_coverage(
+        self, obj: xr.DataArray | xr.Dataset, weights: bool
+    ) -> None:
+        if weights:
+            expected = (
+                obj.notnull()
+                * obj["time"].dt.days_in_month
+                / obj["time"].dt.days_in_month.sum("time")
+                * 100
+            )
+        else:
+            expected = obj.count("time") / obj.sizes["time"] * 100
+        actual = diagnostics.time_weighted_coverage(obj, weights=weights)
+        xr.testing.assert_equal(expected, actual)

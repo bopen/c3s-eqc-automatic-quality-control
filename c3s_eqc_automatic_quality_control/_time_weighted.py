@@ -87,6 +87,19 @@ class TimeWeighted:
             return self.obj.copy(deep=True).polyfit(**kwargs)
         return self.obj.polyfit(**kwargs)
 
+    def coverage(self, **kwargs: Any) -> xr.DataArray | xr.Dataset:
+        if "dim" not in kwargs:
+            kwargs["dim"] = self.time.name
+        if isinstance(self.obj_weighted, (DataArrayWeighted | DatasetWeighted)):
+            cov = (
+                self.obj.notnull()
+                * self.obj_weighted.weights
+                / self.obj_weighted.weights.sum(**kwargs)
+            )
+        else:
+            cov = self.obj.count(**kwargs) / self.obj.sizes[kwargs["dim"]]
+        return cov * 100
+
 
 @overload
 def map_func(
