@@ -534,8 +534,9 @@ def download_and_transform(
                     sources.append(
                         func(request_list=[request]).result["args"][0]["href"]
                     )
-            open_mfdataset_kwargs.pop("preprocess", None)  # Already preprocessed
-            ds = xr.open_mfdataset(sources, **open_mfdataset_kwargs)
+            ds = xr.open_mfdataset(
+                sources, parallel=open_mfdataset_kwargs.get("parallel", False)
+            )
         else:
             # Cache final dataset transformed
             if invalidate_cache:
