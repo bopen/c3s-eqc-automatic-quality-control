@@ -664,6 +664,21 @@ def rolling_weighted_filter(
     weights_mapper: dict[str, Any] = {},
     **rolling_kwargs: Any,
 ) -> xr.DataArray | xr.Dataset:
+    """Apply a rolling weighted filter.
+
+    Parameters
+    ----------
+    obj: DataArray or Dataset
+        Input object
+    weights_mapper: dict
+        Dictionary mapping dimension to 1D weights. Weights are applied using `dot`.
+        E.g., {"time": range(10)}.
+
+    Returns
+    -------
+    DataArray or Dataset
+        Reduced objects
+    """
     rolling_kwargs.setdefault("center", True)
 
     weights_mapper = {
