@@ -15,6 +15,7 @@ dependencies:
 # DO NOT EDIT ABOVE THIS LINE, ADD DEPENDENCIES BELOW
 - pandas-stubs
 - pip
+- scikit-learn
 - types-PyYAML
 - types-requests
 - pip:

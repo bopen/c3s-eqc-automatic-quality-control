@@ -19,8 +19,8 @@ This module manages the execution of the quality control.
 
 import calendar
 import fnmatch
+import functools
 import itertools
-import logging
 import pathlib
 from collections.abc import Callable
 from typing import Any
@@ -28,21 +28,18 @@ from typing import Any
 import cacholote
 import cads_toolbox
 import cf_xarray  # noqa: F401
+import cgul
 import emohawk.readers.directory
+import joblib
 import pandas as pd
 import tqdm
 import xarray as xr
 
-from . import dashboard
-
 cads_toolbox.config.USE_CACHE = True
 
-LOGGER = dashboard.get_logger()
-
-
 # In the future, this kwargs should somehow be handle upstream by the toolbox.
+INVALIDATE_CACHE = False
 TO_XARRAY_KWARGS: dict[str, Any] = {
-    "harmonise": True,
     "pandas_read_csv_kwargs": {"comment": "#"},
 }
 
@@ -61,18 +58,17 @@ def compute_stop_date(switch_month_day: int | None = None) -> pd.Period:
 
 def ceil_to_month(period: pd.Period, month: int = 1) -> pd.Period:
     if period.month > month:
-        period = pd.Period(year=period.year + 1, month=month, freq="M")
+        return pd.Period(year=period.year + 1, month=month, freq="M")
     if period.month < month:
-        period = pd.Period(year=period.year, month=month, freq="M")
+        return pd.Period(year=period.year, month=month, freq="M")
     return period
 
 
 def floor_to_month(period: pd.Period, month: int = 1) -> pd.Period:
     if period.month > month:
-        period = pd.Period(year=period.year, month=month, freq="M")
+        return pd.Period(year=period.year, month=month, freq="M")
     if period.month < month:
-        period = pd.Period(year=period.year - 1, month=month, freq="M")
-
+        return pd.Period(year=period.year - 1, month=month, freq="M")
     return period
 
 
@@ -257,46 +253,56 @@ def split_request(
     if split_all:
         chunks = {k: 1 for k, v in request.items() if isinstance(v, (tuple, list, set))}
 
-    if not chunks:
-        return [request]
-
     requests = []
-    list_values = list(
-        itertools.product(
-            *[
-                build_chunks(request[par], chunk_size)
-                for par, chunk_size in chunks.items()
-            ]
+    if not chunks:
+        requests.append(request)
+    else:
+        list_values = list(
+            itertools.product(
+                *[
+                    build_chunks(request[par], chunk_size)
+                    for par, chunk_size in chunks.items()
+                ]
+            )
         )
-    )
-    for values in list_values:
-        out_request = request.copy()
-        for parameter, value in zip(chunks, values):
-            out_request[parameter] = value
+        for values in list_values:
+            out_request = request.copy()
+            for parameter, value in zip(chunks, values):
+                out_request[parameter] = value
 
-        if not check_non_empty_date(out_request):
-            continue
+            if not check_non_empty_date(out_request):
+                continue
 
-        requests.append(out_request)
-    return requests
-
-
-def preprocess_satellite(ds: xr.Dataset) -> xr.Dataset:
-    # TODO: workaround because the toolbox is not able to open satellite datasets
-    if "time" not in ds.cf and "source" in ds.encoding:
-        ds = ds.expand_dims(source=[pathlib.Path(ds.encoding["source"]).stem])
-    return ds
+            requests.append(out_request)
+    return [ensure_request_gets_cached(request) for request in requests]
 
 
-def get_source(
+def ensure_request_gets_cached(request: dict[str, Any]) -> dict[str, Any]:
+    cacheable_request = {}
+    for k, v in sorted(request.items()):
+        if not isinstance(v, str):
+            try:
+                v = v[0] if len(v) == 1 else list(v)
+            except TypeError:
+                pass
+        cacheable_request[k] = v
+    return cacheable_request
+
+
+def _cached_retrieve(collection_id: str, request: dict[str, Any]) -> emohawk.Data:
+    with cacholote.config.set(use_cache=True, return_cache_entry=False):
+        return cads_toolbox.catalogue.retrieve(collection_id, request).data
+
+
+def get_sources(
     collection_id: str,
     request_list: list[dict[str, Any]],
     exclude: list[str] = ["*.png", "*.json"],
 ) -> list[str]:
     source: set[str] = set()
 
-    for request in tqdm.tqdm(request_list) if len(request_list) > 1 else request_list:
-        data = cads_toolbox.catalogue.retrieve(collection_id, request).data
+    for request in request_list if len(request_list) == 1 else tqdm.tqdm(request_list):
+        data = _cached_retrieve(collection_id, request)
         if content := getattr(data, "_content", None):
             source.update(map(str, content))
         else:
@@ -307,35 +313,85 @@ def get_source(
     return list(source)
 
 
-def postprocess(
-    ds: xr.Dataset,
-    transform_func: Callable[..., xr.Dataset] | None,
-    **transform_func_kwargs: Any,
-) -> xr.Dataset:
-    # TODO: workaround: cgul should make bounds coordinates
+def _set_bound_coords(ds: xr.Dataset) -> xr.Dataset:
+    # TODO: cgul should make bounds coordinates
     bounds = set(sum(ds.cf.bounds.values(), []))
-    ds = ds.set_coords(bounds)
-    # TODO: make cacholote add coordinates? Needed to guarantee roundtrip
-    # See: https://docs.xarray.dev/en/stable/user-guide/io.html#coordinates
-    ds.attrs["coordinates"] = " ".join([str(coord) for coord in ds.coords])
-
-    return (
-        transform_func(ds, **transform_func_kwargs)
-        if transform_func is not None
-        else ds
+    bounds.update(
+        {
+            var
+            for var, da in ds.data_vars.items()
+            if set(da.dims) & {"bnds", "bounds", "vertices"}
+        }
     )
+    ds = ds.set_coords(bounds)
+    for var_names in ds.cf.coordinates.values():
+        if len(var_names) == 2:
+            coord_name, bound_name = sorted(var_names, key=lambda x: len(ds[x].dims))
+            if len(set(ds[bound_name].dims) - set(ds[coord_name].dims)) == 1:
+                ds[coord_name].attrs.setdefault("bounds", bound_name)
+    return ds
+
+
+def _set_time_dim(ds: xr.Dataset, collection_id: str) -> xr.Dataset:
+    # TODO: Some dataset are missing the time dimension, so they can not be squeezed
+    cf_time_dims = set(ds.cf.coordinates.get("time", [])) & set(ds.dims)
+    if not ("time" in ds.dims or cf_time_dims):
+        for time in ("forecast_reference_time", "time"):
+            if time in ds.variables and len(ds[time].dims) <= 1:
+                if not ds[time].dims:
+                    ds = ds.expand_dims(time)
+                else:
+                    # E.g., satellite-methane
+                    ds = ds.swap_dims({ds[time].dims[0]: time})
+                break
+        else:
+            if collection_id.startswith("satellite-") and "source" in ds.encoding:
+                # E.g., satellite-aerosol-properties
+                ds = ds.expand_dims(source=[pathlib.Path(ds.encoding["source"]).stem])
+    return ds
+
+
+def _set_pressure_coord(ds: xr.Dataset) -> xr.Dataset:
+    # TODO: Some satellite data have dimension "pressure" but coordinate "pre"
+    # E.g., satellite-carbon-dioxide
+    if "pre" in ds.variables:
+        da = ds["pre"]
+        if set(da.dims) == {"pressure"} and "pressure" not in ds.variables:
+            ds = ds.assign_coords(pressure=da)
+        ds = ds.drop_vars("pre")
+    return ds
+
+
+def harmonise(ds: xr.Dataset, collection_id: str) -> xr.Dataset:
+    ds = cgul.harmonise(ds)
+    # TODO: Various workarounds that cgul should eventually handle
+    ds = _set_pressure_coord(ds)
+    ds = _set_time_dim(ds, collection_id)
+    ds = _set_bound_coords(ds)
+    return ds
+
+
+def _preprocess(
+    ds: xr.Dataset,
+    collection_id: str,
+    preprocess: Callable[[xr.Dataset], xr.Dataset] | None = None,
+) -> xr.Dataset:
+    if preprocess is not None:
+        ds = preprocess(ds)
+    return harmonise(ds, collection_id)
 
 
 def get_data(source: list[str]) -> Any:
-    # TODO: emohawk not able to open a list of files
     if len(source) == 1:
         return emohawk.open(source[0])
 
+    # TODO: emohawk not able to open a list of files
     emohwak_dir = emohawk.readers.directory.DirectoryReader("")
     emohwak_dir._content = source
     return emohwak_dir
 
 
+@cacholote.cacheable
 def _download_and_transform_requests(
     collection_id: str,
     request_list: list[dict[str, Any]],
@@ -343,11 +399,56 @@ def _download_and_transform_requests(
     transform_func_kwargs: dict[str, Any],
     **open_mfdataset_kwargs: Any,
 ) -> xr.Dataset:
-    data = get_data(get_source(collection_id, request_list))
-    ds = data.to_xarray(
-        **TO_XARRAY_KWARGS, xarray_open_mfdataset_kwargs=open_mfdataset_kwargs
+    # TODO: Ideally, we would always use emohawk.
+    # However, there is not a consistent behavior across backends.
+    # For example, GRIB silently ignore open_mfdataset_kwargs
+    sources = get_sources(collection_id, request_list)
+    try:
+        engine = open_mfdataset_kwargs.get(
+            "engine",
+            {xr.backends.plugins.guess_engine(source) for source in sources},
+        )
+        use_emohawk = len(engine) != 1
+    except ValueError:
+        use_emohawk = True
+
+    open_mfdataset_kwargs["preprocess"] = functools.partial(
+        _preprocess,
+        collection_id=collection_id,
+        preprocess=open_mfdataset_kwargs.get("preprocess", None),
     )
-    return postprocess(ds, transform_func, **transform_func_kwargs)
+
+    if use_emohawk:
+        data = get_data(sources)
+        ds: xr.Dataset = data.to_xarray(
+            xarray_open_mfdataset_kwargs=open_mfdataset_kwargs,
+            **TO_XARRAY_KWARGS,
+        )
+        if not isinstance(ds, xr.Dataset):
+            # When emohawk fails to concat, it silently return a list
+            raise TypeError(f"`emohawk` returned {type(ds)} instead of a xr.Dataset")
+    else:
+        ds = xr.open_mfdataset(sources, **open_mfdataset_kwargs)
+
+    if transform_func is not None:
+        ds = transform_func(ds, **transform_func_kwargs)
+        if not isinstance(ds, xr.Dataset):
+            raise TypeError(
+                f"`transform_func` must return a xr.Dataset, while it returned {type(ds)}"
+            )
+
+    # TODO: make cacholote add coordinates? Needed to guarantee roundtrip
+    # See: https://docs.xarray.dev/en/stable/user-guide/io.html#coordinates
+    ds.attrs["coordinates"] = " ".join([str(coord) for coord in ds.coords])
+    return ds
+
+
+@joblib.delayed  # type: ignore[misc]
+def _delayed_download(
+    collection_id: str, request: dict[str, Any], config: cacholote.config.Settings
+) -> None:
+    with cacholote.config.set(**dict(config)):
+        _cached_retrieve(collection_id, request)
 
 
 def download_and_transform(
@@ -358,7 +459,8 @@ def download_and_transform(
     transform_func: Callable[..., xr.Dataset] | None = None,
     transform_func_kwargs: dict[str, Any] = {},
     transform_chunks: bool = True,
-    logger: logging.Logger | None = None,
+    n_jobs: int | None = None,
+    invalidate_cache: bool | None = None,
     **open_mfdataset_kwargs: Any,
 ) -> xr.Dataset:
     """
@@ -384,6 +486,11 @@ def download_and_transform(
         Kwargs to be passed on to `transform_func`
     transform_chunks: bool
         Whether to transform and cache each chunk or the whole dataset
+    n_jobs: int, optional
+        Number of jobs for parallel download (download everything first)
+    invalidate_cache: bool, optional
+        Whether to invalidate the cache entry or not.
+        If None, use global variable INVALIDATE_CACHE
     **open_mfdataset_kwargs:
         Kwargs to be passed on to xr.open_mfdataset
 
@@ -391,55 +498,52 @@ def download_and_transform(
     -------
     xr.Dataset
     """
-    logger = logger or LOGGER
+    if invalidate_cache is None:
+        invalidate_cache = INVALIDATE_CACHE
 
-    # Handle satellite data
-    original_preprocess = open_mfdataset_kwargs.pop("preprocess", None)
-    if collection_id.startswith("satellite-"):
+    func = functools.partial(
+        _download_and_transform_requests,
+        collection_id=collection_id,
+        transform_func=transform_func,
+        transform_func_kwargs=transform_func_kwargs,
+        **open_mfdataset_kwargs,
+    )
 
-        def preprocess(ds: xr.Dataset) -> xr.Dataset:
-            ds = preprocess_satellite(ds)
-            if original_preprocess is None:
-                return ds
-            ds = original_preprocess(preprocess_satellite(ds))
-            return ds
-
-    else:
-        preprocess = original_preprocess
-
-    # Cache results
-    download_and_transform_requests = _download_and_transform_requests
-    if transform_func is not None:
-        download_and_transform_requests = cacholote.cacheable(
-            download_and_transform_requests
-        )
-
-    # Split requests
     request_list = []
     for request in ensure_list(requests):
         request_list.extend(split_request(request, chunks, split_all))
 
-    if not transform_chunks or transform_func is None:
-        return download_and_transform_requests(
-            collection_id,
-            request_list,
-            transform_func,
-            transform_func_kwargs,
-            preprocess=preprocess,
-            **open_mfdataset_kwargs,
+    if n_jobs is not None:
+        # Download all data in parallel
+        joblib.Parallel(n_jobs=n_jobs)(
+            _delayed_download(collection_id, request, cacholote.config.get())
+            for request in request_list
         )
 
-    sources = []
-    for request in tqdm.tqdm(request_list):
-        ds = download_and_transform_requests(
-            collection_id,
-            [request],
-            transform_func,
-            transform_func_kwargs,
-            preprocess=preprocess,
-            **open_mfdataset_kwargs,
-        )
-        sources.append(ds.encoding["source"])
-    return xr.open_mfdataset(
-        sources, preprocess=original_preprocess, **open_mfdataset_kwargs
-    )
+    use_cache = transform_func is not None
+    with cacholote.config.set(use_cache=use_cache):
+        if use_cache and transform_chunks:
+            # Cache each chunk transformed
+            sources = []
+            for request in tqdm.tqdm(request_list):
+                if invalidate_cache:
+                    cacholote.delete(
+                        func.func, *func.args, request_list=[request], **func.keywords
+                    )
+                with cacholote.config.set(return_cache_entry=True):
+                    sources.append(
+                        func(request_list=[request]).result["args"][0]["href"]
+                    )
+            ds = xr.open_mfdataset(
+                sources, parallel=open_mfdataset_kwargs.get("parallel", False)
+            )
+        else:
+            # Cache final dataset transformed
+            if invalidate_cache:
+                cacholote.delete(
+                    func.func, *func.args, request_list=request_list, **func.keywords
+                )
+            ds = func(request_list=request_list)
+
+    ds.attrs.pop("coordinates", None)  # Previously added to guarantee roundtrip
+    return ds
