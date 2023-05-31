@@ -26,16 +26,22 @@ def test_all() -> None:
         xr.tutorial.open_dataset("era5-2mt-2019-03-uk.grib")["t2m"],
     ],
 )
-def test_regrid(obj: xr.DataArray | xr.Dataset) -> None:
-    fs, dirname = cacholote.utils.get_cache_files_fs_dirname()
-    assert fs.ls(dirname) == []  # cache is empty
+class TestDiagnostics:
+    def test_regrid(self, obj: xr.DataArray | xr.Dataset) -> None:
+        fs, dirname = cacholote.utils.get_cache_files_fs_dirname()
+        assert fs.ls(dirname) == []  # cache is empty
 
-    for _, obj in obj.isel(time=slice(2)).groupby("time"):
-        expected = obj.isel(longitude=slice(10), latitude=slice(10))
-        actual = diagnostics.regrid(obj, expected, "nearest_s2d")
-        xr.testing.assert_equal(actual, expected)
-        assert actual.attrs["regrid_method"] == "nearest_s2d"
-        assert len(fs.ls(dirname)) == 1  # re-use weights
+        for _, obj in obj.isel(time=slice(2)).groupby("time"):
+            expected = obj.isel(longitude=slice(10), latitude=slice(10))
+            actual = diagnostics.regrid(obj, expected, "nearest_s2d")
+            xr.testing.assert_equal(actual, expected)
+            assert actual.attrs["regrid_method"] == "nearest_s2d"
+            assert len(fs.ls(dirname)) == 1  # re-use weights
+
+    def test_rolling_weighted_filter(self, obj: xr.DataArray | xr.Dataset) -> None:
+        expected = obj.rolling(time=10, center=True).mean("time")
+        actual = diagnostics.rolling_weighted_filter(obj, {"time": [0.1] * 10})
+        xr.testing.assert_allclose(expected, actual)
 
 
 def test_grid_cell_area() -> None:
