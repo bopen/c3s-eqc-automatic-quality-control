@@ -461,6 +461,7 @@ def download_and_transform(
     transform_chunks: bool = True,
     n_jobs: int | None = None,
     invalidate_cache: bool | None = None,
+    cached_open_mfdataset_kwargs: bool | dict[str, Any] = {},
     **open_mfdataset_kwargs: Any,
 ) -> xr.Dataset:
     """
@@ -491,8 +492,11 @@ def download_and_transform(
     invalidate_cache: bool, optional
         Whether to invalidate the cache entry or not.
         If None, use global variable INVALIDATE_CACHE
+    cached_open_mfdataset_kwargs: bool | dict
+        Kwargs to be passed on to xr.open_mfdataset for cached files.
+        If True, use open_mfdataset_kwargs used for raw files.
     **open_mfdataset_kwargs:
-        Kwargs to be passed on to xr.open_mfdataset
+        Kwargs to be passed on to xr.open_mfdataset for raw files.
 
     Returns
     -------
@@ -500,6 +504,12 @@ def download_and_transform(
     """
     if invalidate_cache is None:
         invalidate_cache = INVALIDATE_CACHE
+
+    cached_open_mfdataset_kwargs = (
+        open_mfdataset_kwargs
+        if cached_open_mfdataset_kwargs is True
+        else cached_open_mfdataset_kwargs or {}
+    )
 
     func = functools.partial(
         _download_and_transform_requests,
@@ -534,9 +544,7 @@ def download_and_transform(
                     sources.append(
                         func(request_list=[request]).result["args"][0]["href"]
                     )
-            ds = xr.open_mfdataset(
-                sources, parallel=open_mfdataset_kwargs.get("parallel", False)
-            )
+            ds = xr.open_mfdataset(sources, **cached_open_mfdataset_kwargs)
         else:
             # Cache final dataset transformed
             if invalidate_cache:
