@@ -89,7 +89,7 @@ def run_dashboard(
     rich.print(table)
 
 
-@app.command(name="list-tasks", no_args_is_help=True)
+@app.command(name="list-tasks")
 def list_task(
     base_url: str = typer.Option(cim.CIM, "--base-url", "-b"),
     api_user: str = typer.Option(None, "--user", "-u"),
