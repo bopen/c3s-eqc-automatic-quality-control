@@ -22,7 +22,7 @@ import os.path
 import rich
 import typer
 
-from . import cim, dashboard, runner
+from . import cim, dashboard, runner, __version__
 
 STATUSES = {
     "DONE": "[green]DONE[/]",
@@ -55,12 +55,12 @@ def show_diagnostics() -> None:
     rich.print(table)
 
 
-@app.command()
+@app.command(no_args_is_help=True)
 def run(
     notebook_path: str,
     qar_id: str = typer.Option("000", "--qar-id", "-q"),
     run_n: str = typer.Option("0", "--run-n", "-n"),
-    target_dir: str = typer.Option(".", "--target-dir", "-t"),
+    target_dir: str = typer.Option(..., "--target-dir", "-t"),
 ) -> None:
     """Run notebook."""
     runner.run(
@@ -89,20 +89,20 @@ def run_dashboard(
     rich.print(table)
 
 
-@app.command(name="list-tasks")
+@app.command(name="list-tasks", no_args_is_help=True)
 def list_task(
     base_url: str = typer.Option(cim.CIM, "--base-url", "-b"),
-    user: str = typer.Option(None, "--user", "-u"),
-    passwd: str = typer.Option(None, "--pass", "-p"),
+    api_user: str = typer.Option(None, "--user", "-u"),
+    api_passwd: str = typer.Option(None, "--pass", "-p"),
 ) -> None:
     """List QAR tasks."""
-    if None in (user, passwd):
-        user, passwd = cim.get_api_credentials()
-    res = cim.get_tasks(base_url, user=user, passwd=passwd)
+    if None in (api_user, api_passwd):
+        api_user, api_passwd = cim.get_api_credentials()
+    res = cim.get_tasks(base_url, user=api_user, passwd=api_passwd)
     rich.print(res)
 
 
-@app.command(name="push-notebook")
+@app.command(name="push-notebook", no_args_is_help=True)
 def push(
     notebook_path: str,
     repo_url: str = typer.Option(None, "--repo", "-r"),
@@ -122,6 +122,7 @@ def push(
 def info() -> None:
     """Print info about EQC AQC installation."""
     etc = dashboard.ensure_log_dir()
+    rich.print(f"EQC AQC version: {__version__}")
     rich.print("LOG DIR:", etc)
 
 
