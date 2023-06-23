@@ -420,7 +420,7 @@ def lccs_bar(
 
 def seasonal_boxplot(
     da: xr.DataArray, time_dim: Hashable | None = None, **kwargs: Any
-) -> "pd.Series[Axes]":
+) -> Any:
     """
     Plot a seasonal boxplot.
 
@@ -444,9 +444,7 @@ def seasonal_boxplot(
 
     da = da.stack(stacked_dim=da.dims)
     df = da.to_dataframe()
-    axes: pd.Series[Axes] = df.groupby(by=da[time_dim].dt.season.values).boxplot(
-        **kwargs
-    )
+    axes = df.groupby(by=da[time_dim].dt.season.values).boxplot(**kwargs)
     for ax in axes:
         ax.xaxis.set_ticklabels([])
 

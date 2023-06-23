@@ -37,8 +37,9 @@ import xarray as xr
 
 cads_toolbox.config.USE_CACHE = True
 
-# In the future, this kwargs should somehow be handle upstream by the toolbox.
+N_JOBS = 1
 INVALIDATE_CACHE = False
+# TODO: This kwargs should somehow be handle upstream by the toolbox.
 TO_XARRAY_KWARGS: dict[str, Any] = {
     "pandas_read_csv_kwargs": {"comment": "#"},
 }
@@ -489,6 +490,7 @@ def download_and_transform(
         Whether to transform and cache each chunk or the whole dataset
     n_jobs: int, optional
         Number of jobs for parallel download (download everything first)
+        If None, use global variable N_JOBS
     invalidate_cache: bool, optional
         Whether to invalidate the cache entry or not.
         If None, use global variable INVALIDATE_CACHE
@@ -502,6 +504,9 @@ def download_and_transform(
     -------
     xr.Dataset
     """
+    if n_jobs is None:
+        n_jobs = N_JOBS
+
     if invalidate_cache is None:
         invalidate_cache = INVALIDATE_CACHE
 
@@ -523,7 +528,7 @@ def download_and_transform(
     for request in ensure_list(requests):
         request_list.extend(split_request(request, chunks, split_all))
 
-    if n_jobs is not None:
+    if n_jobs != 1:
         # Download all data in parallel
         joblib.Parallel(n_jobs=n_jobs)(
             _delayed_download(collection_id, request, cacholote.config.get())
