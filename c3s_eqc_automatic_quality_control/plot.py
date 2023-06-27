@@ -249,7 +249,7 @@ def projected_map(
                 txt,
                 ha="left",
                 va="center",
-                figure=plot_obj.figure,
+                figure=plot_obj.axes.figure,
                 fontfamily="monospace",
             )
 
