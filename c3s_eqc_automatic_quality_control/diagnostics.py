@@ -24,13 +24,14 @@ import pyproj
 import xarray as xr
 from xarray.core.common import DataWithCoords
 
-from . import _grid_cell_area, _regrid, _spatial_weighted, _time_weighted
+from . import _grid_cell_area, _regrid, _spatial_weighted, _time_weighted, utils
 
 __all__ = [
     "annual_weighted_mean",
     "annual_weighted_std",
     "grid_cell_area",
     "regrid",
+    "rolling_weighted_filter",
     "seasonal_weighted_mean",
     "seasonal_weighted_std",
     "spatial_weighted_corr",
@@ -655,3 +656,40 @@ def grid_cell_area(
         ds.cf.get_bounds("latitude").to_dict(),
         geod,
     )["cell_area"]
+
+
+@utils.keep_attrs
+def rolling_weighted_filter(
+    obj: xr.DataArray | xr.Dataset,
+    weights_mapper: dict[str, Any] = {},
+    **rolling_kwargs: Any,
+) -> xr.DataArray | xr.Dataset:
+    """Apply a rolling weighted filter.
+
+    Parameters
+    ----------
+    obj: DataArray or Dataset
+        Input object
+    weights_mapper: dict
+        Dictionary mapping dimension to 1D weights. Weights are applied using `dot`.
+        E.g., {"time": range(10)}.
+
+    Returns
+    -------
+    DataArray or Dataset
+        Reduced objects
+    """
+    rolling_kwargs.setdefault("center", True)
+
+    weights_mapper = {
+        k: xr.DataArray(v, dims=f"{k}_window") for k, v in weights_mapper.items()
+    }
+    ds = obj if isinstance(obj, xr.Dataset) else obj._to_temp_dataset()
+    ds = (
+        ds.rolling({k: v.size for k, v in weights_mapper.items()}, **rolling_kwargs)
+        .construct({k: f"{k}_window" for k in weights_mapper})
+        .map(xr.dot, args=weights_mapper.values())
+    )
+    if isinstance(obj, xr.DataArray):
+        return obj._from_temp_dataset(ds)
+    return ds

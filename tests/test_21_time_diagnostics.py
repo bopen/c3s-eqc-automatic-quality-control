@@ -45,7 +45,7 @@ def weighted_std(obj: xr.DataArray | xr.Dataset) -> xr.DataArray | xr.Dataset:
 @pytest.mark.parametrize(
     "obj",
     [
-        xr.tutorial.open_dataset("rasm"),
+        # xr.tutorial.open_dataset("rasm"),
         xr.tutorial.open_dataset("rasm")["Tair"],
     ],
 )

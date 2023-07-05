@@ -37,8 +37,9 @@ import xarray as xr
 
 cads_toolbox.config.USE_CACHE = True
 
-# In the future, this kwargs should somehow be handle upstream by the toolbox.
+N_JOBS = 1
 INVALIDATE_CACHE = False
+# TODO: This kwargs should somehow be handle upstream by the toolbox.
 TO_XARRAY_KWARGS: dict[str, Any] = {
     "pandas_read_csv_kwargs": {"comment": "#"},
 }
@@ -461,6 +462,7 @@ def download_and_transform(
     transform_chunks: bool = True,
     n_jobs: int | None = None,
     invalidate_cache: bool | None = None,
+    cached_open_mfdataset_kwargs: bool | dict[str, Any] = {},
     **open_mfdataset_kwargs: Any,
 ) -> xr.Dataset:
     """
@@ -488,18 +490,31 @@ def download_and_transform(
         Whether to transform and cache each chunk or the whole dataset
     n_jobs: int, optional
         Number of jobs for parallel download (download everything first)
+        If None, use global variable N_JOBS
     invalidate_cache: bool, optional
         Whether to invalidate the cache entry or not.
         If None, use global variable INVALIDATE_CACHE
+    cached_open_mfdataset_kwargs: bool | dict
+        Kwargs to be passed on to xr.open_mfdataset for cached files.
+        If True, use open_mfdataset_kwargs used for raw files.
     **open_mfdataset_kwargs:
-        Kwargs to be passed on to xr.open_mfdataset
+        Kwargs to be passed on to xr.open_mfdataset for raw files.
 
     Returns
     -------
     xr.Dataset
     """
+    if n_jobs is None:
+        n_jobs = N_JOBS
+
     if invalidate_cache is None:
         invalidate_cache = INVALIDATE_CACHE
+
+    cached_open_mfdataset_kwargs = (
+        open_mfdataset_kwargs
+        if cached_open_mfdataset_kwargs is True
+        else cached_open_mfdataset_kwargs or {}
+    )
 
     func = functools.partial(
         _download_and_transform_requests,
@@ -513,7 +528,7 @@ def download_and_transform(
     for request in ensure_list(requests):
         request_list.extend(split_request(request, chunks, split_all))
 
-    if n_jobs is not None:
+    if n_jobs != 1:
         # Download all data in parallel
         joblib.Parallel(n_jobs=n_jobs)(
             _delayed_download(collection_id, request, cacholote.config.get())
@@ -534,9 +549,7 @@ def download_and_transform(
                     sources.append(
                         func(request_list=[request]).result["args"][0]["href"]
                     )
-            ds = xr.open_mfdataset(
-                sources, parallel=open_mfdataset_kwargs.get("parallel", False)
-            )
+            ds = xr.open_mfdataset(sources, **cached_open_mfdataset_kwargs)
         else:
             # Cache final dataset transformed
             if invalidate_cache:
