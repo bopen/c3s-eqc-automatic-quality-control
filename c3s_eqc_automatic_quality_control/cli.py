@@ -22,7 +22,7 @@ import os.path
 import rich
 import typer
 
-from . import cim, dashboard, runner, __version__
+from . import __version__, cim, dashboard, runner
 
 STATUSES = {
     "DONE": "[green]DONE[/]",
@@ -90,7 +90,7 @@ def run_dashboard(
 
 
 @app.command(name="list-tasks")
-def list_task(
+def list_tasks(
     base_url: str = typer.Option(cim.CIM, "--base-url", "-b"),
     api_user: str = typer.Option(None, "--user", "-u"),
     api_passwd: str = typer.Option(None, "--pass", "-p"),
@@ -102,19 +102,50 @@ def list_task(
     rich.print(res)
 
 
+@app.command(name="get-task", no_args_is_help=True)
+def get_task(
+    task_id: str,
+    base_url: str = typer.Option(cim.CIM, "--base-url", "-b"),
+    api_user: str = typer.Option(None, "--user", "-u"),
+    api_passwd: str = typer.Option(None, "--pass", "-p"),
+) -> None:
+    """Get QAR task info."""
+    if None in (api_user, api_passwd):
+        api_user, api_passwd = cim.get_api_credentials()
+    res = cim.get_task(base_url, user=api_user, passwd=api_passwd, task_id=task_id)
+    rich.print(res)
+
+
 @app.command(name="push-notebook", no_args_is_help=True)
 def push(
     notebook_path: str,
     repo_url: str = typer.Option(None, "--repo", "-r"),
     branch: str = typer.Option("notebooks", "--branch", "-b"),
-    user_dir: str = typer.Option("user", "--user", "-u"),
+    user_dir: str = typer.Option("default", "--user", "-u"),
 ) -> None:
     """Push rendered notebooks."""
-    cim.push_notebook(
+    permalink = cim.push_notebook(
         notebook_path=notebook_path,
         repo_url=repo_url,
         branch=branch,
         user_dir=user_dir,
+    )
+    rich.print("Permalink:", permalink)
+
+
+@app.command(name="add-qar-url", no_args_is_help=True)
+def add_qar_url(
+    url: str,
+    task_id: str,
+    base_url: str = typer.Option(cim.CIM, "--base-url", "-b"),
+    api_user: str = typer.Option(None, "--user", "-u"),
+    api_passwd: str = typer.Option(None, "--pass", "-p"),
+) -> None:
+    """Add notebook url to QAR."""
+    if None in (api_user, api_passwd):
+        api_user, api_passwd = cim.get_api_credentials()
+    cim.add_qar_url(
+        base_url, user=api_user, passwd=api_passwd, task_id=task_id, url=url
     )
 
 

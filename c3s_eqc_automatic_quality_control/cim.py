@@ -56,6 +56,15 @@ def get_tasks(baseurl: str, user: str, passwd: str) -> Any:
     return res.json().get("content")
 
 
+def get_task(baseurl: str, user: str, passwd: str, task_id: str) -> Any:
+    tasks = get_tasks(baseurl, user, passwd)
+    for task in tasks:
+        if task["id"] == task_id:
+            return task
+    else:
+        raise ValueError(f"No task available with ID: {task_id}")
+
+
 def push_notebook(
     notebook_path: str, repo_url: str, branch: str, user_dir: str
 ) -> None:
@@ -66,7 +75,8 @@ def push_notebook(
         # Clone the repository
         repo = git.Repo.clone_from(repo_url, tempdir, branch=branch)  # type: ignore[attr-defined]
 
-        dest_dir = f"{tempdir}/rendered_notebooks/{user_dir}"
+        relative_dest_dir = f"rendered_notebooks/{user_dir}"
+        dest_dir = f"{tempdir}/{relative_dest_dir}"
         try:
             os.makedirs(dest_dir)
         except FileExistsError:
@@ -82,8 +92,21 @@ def push_notebook(
 
         # Commit the file
         commit_message = f"Add notebooks: {', '.join(executed)}"
-        repo.index.commit(commit_message)
+        commit = repo.index.commit(commit_message)
 
         # Push the changes
         origin = repo.remote(name="origin")
         origin.push(refspec=f"{branch}:{branch}")
+
+        # Build permalink
+        base_url, _ = os.path.splitext(repo_url)
+        return f"{base_url}/blob/{commit}/{relative_dest_dir}/{executed_nb}"
+
+
+def add_qar_url(baseurl: str, user: str, passwd: str, task_id: str, url: str) -> None:
+    # Check task_id is a valid task
+    get_task(baseurl, user, passwd, task_id)
+
+    payload = {"review_jupyter_url": {"jupyter_notebook_url": url}}
+    endpoint = f"{baseurl}/workflows/cds/tasks/{task_id}"
+    http_request(url=endpoint, auth=(user, passwd), request="post", json=payload)
