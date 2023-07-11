@@ -205,6 +205,10 @@ def projected_map(
     if "ax" not in kwargs:
         subplot_kws = kwargs.setdefault("subplot_kws", dict())
         subplot_kws.setdefault("projection", projection)
+    if "x" not in kwargs:
+        kwargs["x"] = utils.get_coord_name(da, "longitude")
+    if "y" not in kwargs:
+        kwargs["y"] = utils.get_coord_name(da, "latitude")
 
     # Plot
     plot_obj = (da.plot if plot_func is None else getattr(da.plot, plot_func))(**kwargs)
