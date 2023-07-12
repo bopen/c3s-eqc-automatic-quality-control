@@ -335,6 +335,14 @@ def _set_bound_coords(ds: xr.Dataset) -> xr.Dataset:
 
 def _set_time_dim(ds: xr.Dataset, collection_id: str) -> xr.Dataset:
     # TODO: Some dataset are missing the time dimension, so they can not be squeezed
+    if collection_id == "satellite-earth-radiation-budget":
+        if "time" in ds:
+            try:
+                ds["time"].dt
+            except TypeError:
+                # Drop as it's not a time variable
+                ds = ds.squeeze("time", drop=True)
+
     cf_time_dims = set(ds.cf.coordinates.get("time", [])) & set(ds.dims)
     if not ("time" in ds.dims or cf_time_dims):
         for time in ("forecast_reference_time", "time"):
