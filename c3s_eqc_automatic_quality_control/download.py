@@ -193,7 +193,7 @@ def update_request_date(
 
 
 def ensure_list(obj: Any) -> list[Any]:
-    if isinstance(obj, (list, tuple)):
+    if isinstance(obj, list | tuple):
         return list(obj)
     else:
         return [obj]
@@ -252,7 +252,7 @@ def split_request(
     if chunks and split_all:
         raise ValueError("`chunks` and `split_all` are mutually exclusive")
     if split_all:
-        chunks = {k: 1 for k, v in request.items() if isinstance(v, (tuple, list, set))}
+        chunks = {k: 1 for k, v in request.items() if isinstance(v, tuple | list | set)}
 
     requests = []
     if not chunks:

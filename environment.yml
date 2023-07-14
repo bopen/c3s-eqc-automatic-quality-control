@@ -23,7 +23,7 @@ dependencies:
 - numpy
 - pip
 - plotly
-- pydantic
+- pydantic == 1.*
 - python-dotenv
 - pyyaml
 - pyproj
@@ -36,6 +36,7 @@ dependencies:
 - typing_extensions
 - xarray
 - xesmf >= 0.7.0
+- xskillscore
 - pip:
   - cacholote
   - cads-toolbox

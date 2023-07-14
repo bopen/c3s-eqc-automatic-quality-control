@@ -17,7 +17,7 @@ This module gathers available diagnostics.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from collections.abc import Hashable
+from collections.abc import Callable, Hashable
 from typing import Any
 
 import pyproj
@@ -47,6 +47,19 @@ __all__ = [
     "time_weighted_mean",
     "time_weighted_std",
 ]
+
+
+def _apply_attrs_func(
+    obj_out: xr.Dataset | xr.DataArray,
+    obj_in: xr.Dataset | xr.DataArray,
+    attrs_func: Callable[[dict[str, Any]], dict[str, Any]],
+) -> xr.Dataset | xr.DataArray:
+    if isinstance(obj_out, xr.Dataset):
+        for var, da in obj_out.data_vars.items():
+            da.attrs = attrs_func(obj_in[var].attrs)
+    else:
+        obj_out.attrs = attrs_func(obj_in.attrs)
+    return obj_out
 
 
 def regrid(
@@ -83,8 +96,13 @@ def time_weighted_linear_trend(
     obj: xr.DataArray | xr.Dataset,
     time_name: Hashable | None = None,
     weights: xr.DataArray | bool = True,
+    p_value: bool = False,
     **kwargs: Any,
-) -> xr.DataArray | xr.Dataset:
+) -> (
+    xr.DataArray
+    | xr.Dataset
+    | tuple[xr.DataArray | xr.Dataset, xr.DataArray | xr.Dataset]
+):
     """
     Calculate time weighted linear trend.
 
@@ -105,27 +123,19 @@ def time_weighted_linear_trend(
     DataArray or Dataset
         Reduced object
     """
-    ds = obj.to_dataset(name=obj.name or "") if isinstance(obj, xr.DataArray) else obj
-    ds_trend = (
-        _time_weighted.TimeWeighted(ds, time_name, weights)
-        .polyfit(deg=1, **kwargs)
-        .sel(degree=1, drop=True)
+    obj_tuple = _time_weighted.TimeWeighted(obj, time_name, weights).linear_trend(
+        p_value=p_value, **kwargs
     )
-    ds_trend = ds_trend * 1.0e9  # 1/ns to 1/s
-    ds_trend = ds_trend.rename(
-        {
-            var: str(var).removesuffix("_polyfit_coefficients")
-            for var in ds_trend.data_vars
+    trend = obj_tuple[0] * 1.0e9  # 1/ns to 1/s
+
+    def attrs_func(attrs: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "long_name": f"Linear trend of {attrs.get('long_name', '')}",
+            "units": f"{attrs.get('units', '')} s-1",
         }
-    )
-    for var, da in ds_trend.items():
-        da.attrs = {
-            "long_name": f"Linear trend of {ds[var].attrs.get('long_name', '')}",
-            "units": f"{ds[var].attrs.get('units', '')} s-1",
-        }
-    if isinstance(obj, xr.DataArray):
-        return ds_trend[obj.name or ""]
-    return ds_trend
+
+    trend = _apply_attrs_func(trend, obj, attrs_func)
+    return trend if not p_value else (trend, obj_tuple[1])
 
 
 def time_weighted_mean(
@@ -218,18 +228,13 @@ def time_weighted_coverage(
     """
     coverage = _time_weighted.TimeWeighted(obj, time_name, weights).coverage(**kwargs)
 
-    def update_attrs(da: xr.DataArray, attrs: dict[str, Any]) -> None:
-        da.attrs = {
+    def attrs_func(attrs: dict[str, Any]) -> dict[str, Any]:
+        return {
             "long_name": f"Normalized coverage of {attrs.get('long_name', '')}",
             "units": "1",
         }
 
-    if isinstance(coverage, xr.Dataset):
-        for var, da in coverage.data_vars.items():
-            update_attrs(da, obj[var].attrs)
-    else:
-        update_attrs(coverage, obj.attrs)
-    return coverage
+    return _apply_attrs_func(coverage, obj, attrs_func)
 
 
 def seasonal_weighted_mean(

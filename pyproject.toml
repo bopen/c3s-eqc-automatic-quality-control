@@ -41,7 +41,8 @@ module = [
   "plotly.*",
   "shapely",
   "sklearn.*",
-  "xesmf"
+  "xesmf",
+  "xskillscore"
 ]
 
 [tool.ruff]
@@ -70,8 +71,11 @@ select = [
   # isort
   "I",
   # pydocstyle
-  "D"
+  "D",
+  # Pyupgrade
+  "UP"
 ]
+target-version = "py310"
 
 [tool.setuptools]
 packages = ["c3s_eqc_automatic_quality_control"]

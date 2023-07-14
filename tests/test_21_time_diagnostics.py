@@ -3,6 +3,7 @@ from typing import overload
 import numpy as np
 import pytest
 import xarray as xr
+import xskillscore as xs
 
 from c3s_eqc_automatic_quality_control import diagnostics
 
@@ -134,6 +135,32 @@ class TestTimeWeighted:
             xr.testing.assert_equal(
                 ds_trend.rename(Tair_polyfit_coefficients="Tair"), actual
             )
+
+    def test_time_weighted_p_value(
+        self, obj: xr.DataArray | xr.Dataset, weights: bool
+    ) -> None:
+        actual_tuple = diagnostics.time_weighted_linear_trend(
+            obj, weights=weights, p_value=True
+        )
+
+        da_weights = obj["time"].dt.days_in_month if weights else None
+        coeff = obj.polyfit(dim="time", deg=1, w=da_weights)
+        if isinstance(obj, xr.DataArray):
+            coeff = coeff.polyfit_coefficients
+        else:
+            coeff = coeff.rename(
+                {
+                    var: var.replace("_polyfit_coefficients", "")
+                    for var in map(str, coeff.data_vars)
+                }
+            )
+        fit = xr.polyval(obj["time"], coeff)
+        expected_tuple = (
+            diagnostics.time_weighted_linear_trend(obj, weights=weights),
+            xs.pearson_r_p_value(obj, fit, "time", weights=da_weights),
+        )
+        for actual, expected in zip(actual_tuple, expected_tuple):
+            xr.testing.assert_identical(actual, expected)
 
     def test_time_weighted_coverage(
         self, obj: xr.DataArray | xr.Dataset, weights: bool
