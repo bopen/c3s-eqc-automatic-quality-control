@@ -4,6 +4,7 @@ from collections.abc import Hashable
 from typing import Any, overload
 
 import xarray as xr
+import xskillscore as xs
 from xarray.core.weighted import DataArrayWeighted, DatasetWeighted
 
 from . import utils
@@ -82,10 +83,44 @@ class TimeWeighted:
         if "dim" not in kwargs:
             kwargs["dim"] = self.time.name
 
-        if "w" in kwargs:
-            # TODO: https://github.com/pydata/xarray/issues/5644
-            return self.obj.copy(deep=True).polyfit(**kwargs)
         return self.obj.polyfit(**kwargs)
+
+    def linear_trend(
+        self, p_value: bool = False, **kwargs: Any
+    ) -> tuple[xr.DataArray | xr.Dataset, ...]:
+        coeff = self.polyfit(deg=1, **kwargs)
+        if isinstance(self.obj, xr.DataArray):
+            coeff = coeff["polyfit_coefficients"]
+            coeff.name = self.obj.name or ""
+        else:
+            coeff = coeff.drop_vars(
+                [
+                    varname
+                    for varname in map(str, coeff.data_vars)
+                    if not varname.endswith("_polyfit_coefficients")
+                ]
+            )
+            coeff = coeff.rename(
+                {
+                    varname: varname.replace("_polyfit_coefficients", "")
+                    for varname in map(str, coeff.data_vars)
+                }
+            )
+        obj_trend = coeff.sel(degree=1, drop=True)
+        if not p_value:
+            return (obj_trend,)
+
+        dim = kwargs.get("dim", self.time.name)
+        weights = kwargs.get("w", self.obj_weighted.weights if self.weights else None)
+        fit = xr.polyval(self.obj[dim], coeff)
+        obj_p_value = xs.pearson_r_p_value(
+            self.obj,
+            fit,
+            dim=dim,
+            weights=weights,
+            **{k: v for k, v in kwargs.items() if k == "skipna"},
+        )
+        return (obj_trend, obj_p_value)
 
     def coverage(self, **kwargs: Any) -> xr.DataArray | xr.Dataset:
         if "dim" not in kwargs:

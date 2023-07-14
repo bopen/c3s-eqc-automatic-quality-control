@@ -41,7 +41,8 @@ module = [
   "plotly.*",
   "shapely",
   "sklearn.*",
-  "xesmf"
+  "xesmf",
+  "xskillscore"
 ]
 
 [tool.ruff]
