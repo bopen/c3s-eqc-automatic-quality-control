@@ -1,5 +1,3 @@
-from typing import Union
-
 import numpy as np
 import pytest
 import sklearn.metrics
@@ -8,7 +6,7 @@ from xarray.core.weighted import DataArrayWeighted, DatasetWeighted
 
 from c3s_eqc_automatic_quality_control import diagnostics
 
-XR_WEIGHTED_OR_NOT = Union[xr.DataArray, xr.Dataset, DataArrayWeighted, DatasetWeighted]
+XR_WEIGHTED_OR_NOT = xr.DataArray | xr.Dataset | DataArrayWeighted | DatasetWeighted
 
 
 @pytest.mark.parametrize(
