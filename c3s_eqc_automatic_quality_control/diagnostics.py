@@ -118,7 +118,7 @@ def time_weighted_linear_trend(
         - False: unweighted
         - DataArray: custom weights
     p_value: bool, default: False
-        Whether to compute 2-tailed Pearson p-value 
+        Whether to compute 2-tailed Pearson p-value
 
     Returns
     -------
