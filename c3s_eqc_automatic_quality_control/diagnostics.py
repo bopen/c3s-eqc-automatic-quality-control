@@ -117,11 +117,13 @@ def time_weighted_linear_trend(
         - True: weights are the number of days in each month
         - False: unweighted
         - DataArray: custom weights
+    p_value: bool, default: False
+        Whether to compute 2-tailed Pearson p-value 
 
     Returns
     -------
-    DataArray or Dataset
-        Reduced object
+    DataArray or Dataset or tuple
+        Reduced object or tuple (trend, p_value)
     """
     obj_tuple = _time_weighted.TimeWeighted(obj, time_name, weights).linear_trend(
         p_value=p_value, **kwargs
