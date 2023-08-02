@@ -248,7 +248,7 @@ def monthly_weighted_mean(
     **kwargs: Any,
 ) -> xr.DataArray | xr.Dataset:
     """
-    Calculate month weighted mean.
+    Calculate monthly weighted mean.
 
     Parameters
     ----------
