@@ -74,6 +74,17 @@ class TestTimeWeighted:
         actual = diagnostics.time_weighted_std(obj, weights=weights)
         xr.testing.assert_equal(expected, actual)
 
+    def test_monthly_weighted_mean(
+        self, obj: xr.DataArray | xr.Dataset, weights: bool
+    ) -> None:
+        if weights:
+            expected = (obj).groupby("time.month").map(weighted_mean)
+            expected = expected.where(expected != 0)
+        else:
+            expected = obj.groupby("time.month").mean("time")
+        actual = diagnostics.monthly_weighted_mean(obj, weights=weights)
+        xr.testing.assert_equal(expected, actual)
+
     def test_seasonal_weighted_mean(
         self, obj: xr.DataArray | xr.Dataset, weights: bool
     ) -> None:
@@ -83,6 +94,17 @@ class TestTimeWeighted:
         else:
             expected = obj.groupby("time.season").mean("time")
         actual = diagnostics.seasonal_weighted_mean(obj, weights=weights)
+        xr.testing.assert_equal(expected, actual)
+
+    def test_monthly_weighted_std(
+        self, obj: xr.DataArray | xr.Dataset, weights: bool
+    ) -> None:
+        if weights:
+            expected = obj.groupby("time.month").map(weighted_std)
+            expected = expected.where(expected != 0)
+        else:
+            expected = obj.groupby("time.month").std("time")
+        actual = diagnostics.monthly_weighted_std(obj, weights=weights)
         xr.testing.assert_equal(expected, actual)
 
     def test_seasonal_weighted_std(

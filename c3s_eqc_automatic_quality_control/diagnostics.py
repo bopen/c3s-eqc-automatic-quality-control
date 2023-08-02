@@ -30,6 +30,8 @@ __all__ = [
     "annual_weighted_mean",
     "annual_weighted_std",
     "grid_cell_area",
+    "monthly_weighted_mean",
+    "monthly_weighted_std",
     "regrid",
     "rolling_weighted_filter",
     "seasonal_weighted_mean",
@@ -239,6 +241,37 @@ def time_weighted_coverage(
     return _apply_attrs_func(coverage, obj, attrs_func)
 
 
+def monthly_weighted_mean(
+    obj: xr.DataArray | xr.Dataset,
+    time_name: Hashable | None = None,
+    weights: xr.DataArray | bool = True,
+    **kwargs: Any,
+) -> xr.DataArray | xr.Dataset:
+    """
+    Calculate month weighted mean.
+
+    Parameters
+    ----------
+    obj: DataArray or Dataset
+        Input data
+    time_name: str, optional
+        Name of time coordinate
+    weights: DataArray, bool, default: True
+        Weights to apply:
+        - True: weights are the number of days in each month
+        - False: unweighted
+        - DataArray: custom weights
+
+    Returns
+    -------
+    DataArray or Dataset
+        Reduced object
+    """
+    return _time_weighted.TimeWeighted(obj, time_name, weights).reduce(
+        "mean", "month", **kwargs
+    )
+
+
 def seasonal_weighted_mean(
     obj: xr.DataArray | xr.Dataset,
     time_name: Hashable | None = None,
@@ -267,6 +300,37 @@ def seasonal_weighted_mean(
     """
     return _time_weighted.TimeWeighted(obj, time_name, weights).reduce(
         "mean", "season", **kwargs
+    )
+
+
+def monthly_weighted_std(
+    obj: xr.DataArray | xr.Dataset,
+    time_name: Hashable | None = None,
+    weights: xr.DataArray | bool = True,
+    **kwargs: Any,
+) -> xr.DataArray | xr.Dataset:
+    """
+    Calculate monthly weighted std.
+
+    Parameters
+    ----------
+    obj: DataArray or Dataset
+        Input data
+    time_name: str, optional
+        Name of time coordinate
+    weights: DataArray, bool, default: True
+        Weights to apply:
+        - True: weights are the number of days in each month
+        - False: unweighted
+        - DataArray: custom weights
+
+    Returns
+    -------
+    DataArray or Dataset
+        Reduced object
+    """
+    return _time_weighted.TimeWeighted(obj, time_name, weights).reduce(
+        "std", "month", **kwargs
     )
 
 
