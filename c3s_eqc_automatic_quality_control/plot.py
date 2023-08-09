@@ -217,7 +217,15 @@ def projected_map(
     if isinstance(plot_obj, FacetGrid):
         for ax in plot_obj.axs.flat:
             ax.coastlines()
-            ax.gridlines()
+            ax.gridlines(draw_labels=False)
+
+        for ax in plot_obj.axs[-1, :]:
+            for gl in ax._gridliners:
+                gl.bottom_labels = True
+
+        for ax in plot_obj.axs[:, 0]:
+            for gl in ax._gridliners:
+                gl.left_labels = True
 
         if show_stats:
             warnings.warn(
