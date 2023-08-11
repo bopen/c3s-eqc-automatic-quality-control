@@ -193,7 +193,9 @@ def update_request_date(
 
 
 def ensure_list(obj: Any) -> list[Any]:
-    return list(obj) if isinstance(obj, list | tuple | set | range) else [obj]
+    if isinstance(obj, list | tuple | set | range):
+        return list(obj)
+    return [obj]
 
 
 def check_non_empty_date(request: dict[str, Any]) -> bool:
