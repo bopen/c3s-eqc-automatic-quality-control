@@ -237,8 +237,8 @@ def test_stringify_dates(
 
 def test_ensure_request_gets_cached() -> None:
     request = {
-        "f": (2, 1),
-        "e": [1],
+        "f": range(2, 0, -1),
+        "e": {1},
         "d": 1,
         "c": ["b", "a"],
         "b": ["ba"],
