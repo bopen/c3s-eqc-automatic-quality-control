@@ -236,8 +236,24 @@ def test_stringify_dates(
 
 
 def test_ensure_request_gets_cached() -> None:
-    request = {"f": [2, 1], "e": [1], "d": 1, "c": ["b", "a"], "b": ["ba"], "a": "ba"}
-    expected = {"a": "ba", "b": "ba", "c": ["b", "a"], "d": 1, "e": 1, "f": [2, 1]}
+    request = {
+        "f": (2, 1),
+        "e": [1],
+        "d": 1,
+        "c": ["b", "a"],
+        "b": ["ba"],
+        "a": "ba",
+        "area": (4, 3, 2, 1),
+    }
+    expected = {
+        "a": "ba",
+        "area": [4, 3, 2, 1],
+        "b": "ba",
+        "c": ["a", "b"],
+        "d": 1,
+        "e": 1,
+        "f": [1, 2],
+    }
     assert download.ensure_request_gets_cached(request) == expected
 
 

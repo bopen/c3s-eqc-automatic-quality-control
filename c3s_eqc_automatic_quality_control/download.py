@@ -193,10 +193,7 @@ def update_request_date(
 
 
 def ensure_list(obj: Any) -> list[Any]:
-    if isinstance(obj, list | tuple):
-        return list(obj)
-    else:
-        return [obj]
+    return list(obj) if isinstance(obj, list | tuple | set | range) else [obj]
 
 
 def check_non_empty_date(request: dict[str, Any]) -> bool:
@@ -284,14 +281,12 @@ def split_request(
 
 def ensure_request_gets_cached(request: dict[str, Any]) -> dict[str, Any]:
     cacheable_request = {}
-    for k, v in sorted(request.items()):
-        if not isinstance(v, str):
-            try:
-                v = v[0] if len(v) == 1 else list(v)
-            except TypeError:
-                pass
-        cacheable_request[k] = v
-    return cacheable_request
+    for k, v in request.items():
+        v = ensure_list(v)
+        if k != "area":
+            v = sorted(v)
+        cacheable_request[k] = v[0] if len(v) == 1 else v
+    return dict(sorted(cacheable_request.items()))
 
 
 def _cached_retrieve(collection_id: str, request: dict[str, Any]) -> emohawk.Data:
