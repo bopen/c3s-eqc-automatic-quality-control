@@ -283,12 +283,12 @@ def split_request(
 
 def ensure_request_gets_cached(request: dict[str, Any]) -> dict[str, Any]:
     cacheable_request = {}
-    for k, v in request.items():
+    for k, v in sorted(request.items()):
         v = ensure_list(v)
         if k != "area":
             v = sorted(v)
         cacheable_request[k] = v[0] if len(v) == 1 else v
-    return dict(sorted(cacheable_request.items()))
+    return cacheable_request
 
 
 def _cached_retrieve(collection_id: str, request: dict[str, Any]) -> emohawk.Data:
