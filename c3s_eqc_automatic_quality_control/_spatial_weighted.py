@@ -74,9 +74,6 @@ class SpatialWeighted:
         obj: xr.DataArray | xr.Dataset = getattr(self.obj_weighted, func_name)(**kwargs)
         return obj
 
-    def median(self, **kwargs: Any) -> xr.DataArray | xr.Dataset:
-        return self.reduce(func_name="quantile", q=0.5, **kwargs).drop_vars("quantile")
-
     @utils.keep_attrs
     def centralise(self, **kwargs: Any) -> xr.DataArray | xr.Dataset:
         return self.obj - self.reduce("mean", **kwargs)
