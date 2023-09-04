@@ -41,6 +41,7 @@ __all__ = [
     "spatial_weighted_errors",
     "spatial_weighted_mean",
     "spatial_weighted_median",
+    "spatial_weighted_quantile",
     "spatial_weighted_rmse",
     "spatial_weighted_statistics",
     "spatial_weighted_std",
@@ -518,8 +519,43 @@ def spatial_weighted_median(
     DataArray or Dataset
         Reduced object
     """
-    return _spatial_weighted.SpatialWeighted(obj, lon_name, lat_name, weights).median(
-        **kwargs
+    return spatial_weighted_quantile(
+        obj, q=0.5, lon_name=lon_name, lat_name=lat_name, weights=weights, **kwargs
+    ).drop_vars("quantile")
+
+
+def spatial_weighted_quantile(
+    obj: xr.DataArray | xr.Dataset,
+    q: float | list[float] | tuple[float] | set[float],
+    lon_name: Hashable | None = None,
+    lat_name: Hashable | None = None,
+    weights: xr.DataArray | bool = True,
+    **kwargs: Any,
+) -> xr.Dataset | xr.DataArray:
+    """
+    Calculate spatial mean of ds with latitude weighting.
+
+    Parameters
+    ----------
+    obj: DataArray or Dataset
+        Input data
+    q: float or list/tuple/set of float
+        Quantile to compute, which must be between 0 and 1 inclusive.
+    lon_name, lat_name: str, optional
+        Name of longitude/latitude coordinate
+    weights: DataArray, bool, default: True
+        Weights to apply:
+        - True: weights are the cosine of the latitude
+        - False: unweighted
+        - DataArray: custom weights
+
+    Returns
+    -------
+    DataArray or Dataset
+        Reduced object
+    """
+    return _spatial_weighted.SpatialWeighted(obj, lon_name, lat_name, weights).reduce(
+        "quantile", q=q, **kwargs
     )
 
 
@@ -552,12 +588,12 @@ def spatial_weighted_statistics(
     """
     sw = _spatial_weighted.SpatialWeighted(obj, lon_name, lat_name, weights)
     objects = []
-    for func in ("mean", "std", "median"):
-        if hasattr(sw, func):
-            obj = getattr(sw, func)(**kwargs)
-        else:
-            obj = sw.reduce(func, **kwargs)
-        objects.append(obj.expand_dims(diagnostic=[func]))
+    for func in ("mean", "std"):
+        objects.append(sw.reduce(func, **kwargs).expand_dims(diagnostic=[func]))
+
+    median = sw.reduce("quantile", q=0.5, **kwargs).drop_vars("quantile")
+    objects.append(median.expand_dims(diagnostic=["median"]))
+
     ds = xr.merge(objects)
     return ds[obj.name] if isinstance(obj, xr.DataArray) else ds
 
