@@ -292,7 +292,7 @@ def ensure_request_gets_cached(request: dict[str, Any]) -> dict[str, Any]:
 
 
 def _cached_retrieve(collection_id: str, request: dict[str, Any]) -> emohawk.Data:
-    with cacholote.config.set(use_cache=True, return_cache_entry=False):
+    with cacholote.config.set(return_cache_entry=False):
         return cads_toolbox.catalogue.retrieve(collection_id, request).data
 
 
@@ -401,7 +401,6 @@ def get_data(source: list[str]) -> Any:
     return emohwak_dir
 
 
-@cacholote.cacheable
 def _download_and_transform_requests(
     collection_id: str,
     request_list: list[dict[str, Any]],
@@ -525,8 +524,11 @@ def download_and_transform(
         else cached_open_mfdataset_kwargs or {}
     )
 
+    use_cache = transform_func is not None
     func = functools.partial(
-        _download_and_transform_requests,
+        cacholote.cacheable(_download_and_transform_requests)
+        if use_cache
+        else _download_and_transform_requests,
         collection_id=collection_id,
         transform_func=transform_func,
         transform_func_kwargs=transform_func_kwargs,
@@ -544,28 +546,24 @@ def download_and_transform(
             for request in request_list
         )
 
-    use_cache = transform_func is not None
-    with cacholote.config.set(use_cache=use_cache):
-        if use_cache and transform_chunks:
-            # Cache each chunk transformed
-            sources = []
-            for request in tqdm.tqdm(request_list):
-                if invalidate_cache:
-                    cacholote.delete(
-                        func.func, *func.args, request_list=[request], **func.keywords
-                    )
-                with cacholote.config.set(return_cache_entry=True):
-                    sources.append(
-                        func(request_list=[request]).result["args"][0]["href"]
-                    )
-            ds = xr.open_mfdataset(sources, **cached_open_mfdataset_kwargs)
-        else:
-            # Cache final dataset transformed
+    if use_cache and transform_chunks:
+        # Cache each chunk transformed
+        sources = []
+        for request in tqdm.tqdm(request_list):
             if invalidate_cache:
                 cacholote.delete(
-                    func.func, *func.args, request_list=request_list, **func.keywords
+                    func.func, *func.args, request_list=[request], **func.keywords
                 )
-            ds = func(request_list=request_list)
+            with cacholote.config.set(return_cache_entry=True):
+                sources.append(func(request_list=[request]).result["args"][0]["href"])
+        ds = xr.open_mfdataset(sources, **cached_open_mfdataset_kwargs)
+    else:
+        # Cache final dataset transformed
+        if invalidate_cache:
+            cacholote.delete(
+                func.func, *func.args, request_list=request_list, **func.keywords
+            )
+        ds = func(request_list=request_list)
 
     ds.attrs.pop("coordinates", None)  # Previously added to guarantee roundtrip
     return ds
