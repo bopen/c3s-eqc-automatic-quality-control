@@ -31,8 +31,7 @@ import plotly.express as px
 import plotly.graph_objs as go
 import xarray as xr
 from cartopy.mpl.geocollection import GeoQuadMesh
-from matplotlib.axes import Axes
-from matplotlib.image import AxesImage
+from matplotlib.typing import ColorType
 from xarray.plot.facetgrid import FacetGrid
 
 from . import diagnostics, utils
@@ -43,7 +42,6 @@ VAR_NAMES_MAP = {
 }
 
 FLAGS_T = int | Iterable[int]
-COLOR_T = str | Iterable[str]
 
 
 def line_plot(
@@ -268,7 +266,7 @@ def projected_map(
     return plot_obj
 
 
-def _infer_legend_dict(da: xr.DataArray) -> dict[str, tuple[COLOR_T, FLAGS_T]]:
+def _infer_legend_dict(da: xr.DataArray) -> dict[str, tuple[ColorType, FLAGS_T]]:
     flags = list(map(int, da.attrs["flag_values"]))
     colors = da.attrs["flag_colors"].split()
     meanings = da.attrs["flag_meanings"].split()
@@ -279,7 +277,7 @@ def _infer_legend_dict(da: xr.DataArray) -> dict[str, tuple[COLOR_T, FLAGS_T]]:
     if len(flags) - len(colors) == 1:
         colors.insert(flags.index(0), "#000000")
 
-    legend_dict: dict[str, tuple[COLOR_T, FLAGS_T]] = {}
+    legend_dict: dict[str, tuple[ColorType, FLAGS_T]] = {}
     for m, c, f in zip(meanings, colors, flags, strict=True):
         legend_dict[m.replace("_", " ").title()] = (c, f)
     return legend_dict
@@ -287,9 +285,9 @@ def _infer_legend_dict(da: xr.DataArray) -> dict[str, tuple[COLOR_T, FLAGS_T]]:
 
 def lccs_map(
     da_lccs: xr.DataArray,
-    legend_dict: dict[str, tuple[COLOR_T, FLAGS_T]] | None = None,
+    legend_dict: dict[str, tuple[ColorType, FLAGS_T]] | None = None,
     **kwargs: Any,
-) -> AxesImage | FacetGrid[Any]:
+) -> Any:
     """
     Plot LCCS map.
 
@@ -346,12 +344,12 @@ def lccs_map(
 def lccs_bar(
     da: xr.DataArray,
     da_lccs: xr.DataArray,
-    labels_dict: dict[str, tuple[COLOR_T, FLAGS_T]] | None = None,
+    labels_dict: dict[str, tuple[ColorType, FLAGS_T]] | None = None,
     reduction: str = "mean",
     groupby_bins_dims: dict[str, Any] = {},
     exclude_no_data: bool = True,
     **kwargs: Any,
-) -> Axes:
+) -> Any:
     """
     Plot LCCS map.
 
@@ -424,7 +422,7 @@ def lccs_bar(
         " ".join([reduction.title(), "of", xr.plot.utils.label_from_attrs(da)]),
     )
 
-    ax = df_or_ser.plot.bar(color=colors, **kwargs)
+    ax = df_or_ser.plot.bar(color=list(colors), **kwargs)
     if groupby_bins_dims:
         ax.legend(bbox_to_anchor=(1, 1), loc="upper left")
     return ax
@@ -456,8 +454,5 @@ def seasonal_boxplot(
 
     da = da.stack(stacked_dim=da.dims)
     df = da.to_dataframe()
-    axes = df.groupby(by=da[time_dim].dt.season.values).boxplot(**kwargs)
-    for ax in axes:
-        ax.xaxis.set_ticklabels([])
 
-    return axes
+    return df.groupby(by=da[time_dim].dt.season.values).boxplot(**kwargs)

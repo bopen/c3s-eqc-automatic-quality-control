@@ -37,7 +37,6 @@ module = [
   "emohawk.*",
   "fsspec",
   "joblib",
-  "matplotlib.*",
   "plotly.*",
   "shapely",
   "sklearn.*",

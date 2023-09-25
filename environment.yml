@@ -23,6 +23,7 @@ dependencies:
 - numpy
 - pip
 - plotly
+- pooch
 - pydantic == 1.*
 - python-dotenv
 - pyyaml
