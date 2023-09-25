@@ -440,7 +440,8 @@ def _download_and_transform_requests(
         ds = xr.open_mfdataset(sources, **open_mfdataset_kwargs)
 
     if transform_func is not None:
-        ds = transform_func(ds, **transform_func_kwargs)
+        with cacholote.config.set(return_cache_entry=False):
+            ds = transform_func(ds, **transform_func_kwargs)
         if not isinstance(ds, xr.Dataset):
             raise TypeError(
                 f"`transform_func` must return a xr.Dataset, while it returned {type(ds)}"
