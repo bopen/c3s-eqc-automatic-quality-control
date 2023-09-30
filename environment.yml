@@ -24,7 +24,8 @@ dependencies:
 - pip
 - plotly
 - pooch
-- pydantic == 1.*
+- pydantic
+- pydantic-settings
 - python-dotenv
 - pyyaml
 - pyproj
