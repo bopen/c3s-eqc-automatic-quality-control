@@ -44,6 +44,8 @@ TO_XARRAY_KWARGS: dict[str, Any] = {
     "pandas_read_csv_kwargs": {"comment": "#"},
 }
 
+_SORTED_REQUEST_PARAMETERS = ("area", "grid")
+
 
 def compute_stop_date(switch_month_day: int | None = None) -> pd.Period:
     today = pd.Timestamp.today()
@@ -254,7 +256,7 @@ def split_request(
         chunks = {
             k: 1
             for k, v in request.items()
-            if isinstance(v, tuple | list | set) and k != "area"
+            if isinstance(v, tuple | list | set) and k not in _SORTED_REQUEST_PARAMETERS
         }
 
     requests = []
@@ -285,7 +287,7 @@ def ensure_request_gets_cached(request: dict[str, Any]) -> dict[str, Any]:
     cacheable_request = {}
     for k, v in sorted(request.items()):
         v = ensure_list(v)
-        if k != "area":
+        if k not in _SORTED_REQUEST_PARAMETERS:
             v = sorted(v)
         cacheable_request[k] = v[0] if len(v) == 1 else v
     return cacheable_request
