@@ -90,8 +90,13 @@ def regrid(
     DataArray or Dataset
         Interpolated object
     """
+    call_kwargs = {}
+    for key in {"keep_attrs", "skipna", "na_thres", "output_chunks"} & set(kwargs):
+        call_kwargs[key] = kwargs.pop(key)
+    call_kwargs.setdefault("keep_attrs", True)
+
     regridder = _regrid.cached_regridder(obj, grid_out, method, **kwargs)
-    obj = regridder(obj, keep_attrs=True)
+    obj = regridder(obj, **call_kwargs)
     return obj
 
 
