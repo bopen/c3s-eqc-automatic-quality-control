@@ -305,7 +305,7 @@ def get_sources(
 ) -> list[str]:
     source: set[str] = set()
 
-    for request in request_list if len(request_list) == 1 else tqdm.tqdm(request_list):
+    for request in tqdm.tqdm(request_list, disable=len(request_list) <= 1):
         data = _cached_retrieve(collection_id, request)
         if content := getattr(data, "_content", None):
             source.update(map(str, content))
@@ -431,7 +431,11 @@ def _download_and_transform_requests(
 
     if use_emohawk:
         data = get_data(sources)
-        ds: xr.Dataset = data.to_xarray(
+        if isinstance(data, emohawk.readers.shapefile.ShapefileReader):
+            to_xarray = data.to_pandas().to_xarray
+        else:
+            to_xarray = data.to_xarray
+        ds: xr.Dataset = to_xarray(
             xarray_open_mfdataset_kwargs=open_mfdataset_kwargs,
             **TO_XARRAY_KWARGS,
         )

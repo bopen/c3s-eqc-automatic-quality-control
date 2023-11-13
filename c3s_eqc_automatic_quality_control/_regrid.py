@@ -31,7 +31,7 @@ def cached_regridder(
     grid_in: xr.Dataset | xr.DataArray,
     grid_out: xr.Dataset | xr.DataArray,
     method: str,
-    **kwargs: Any
+    **kwargs: Any,
 ) -> xe.Regridder:
     if isinstance(grid_in, xr.Dataset):
         # Remove bounds attributes, they can generate conflicts
