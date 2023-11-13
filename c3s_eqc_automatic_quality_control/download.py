@@ -432,13 +432,13 @@ def _download_and_transform_requests(
     if use_emohawk:
         data = get_data(sources)
         if isinstance(data, emohawk.readers.shapefile.ShapefileReader):
-            to_xarray = data.to_pandas().to_xarray
+            # FIXME: emohawk NotImplementedError
+            ds: xr.Dataset = data.to_pandas().to_xarray()
         else:
-            to_xarray = data.to_xarray
-        ds: xr.Dataset = to_xarray(
-            xarray_open_mfdataset_kwargs=open_mfdataset_kwargs,
-            **TO_XARRAY_KWARGS,
-        )
+            ds = data.to_xarray(
+                xarray_open_mfdataset_kwargs=open_mfdataset_kwargs,
+                **TO_XARRAY_KWARGS,
+            )
         if not isinstance(ds, xr.Dataset):
             # When emohawk fails to concat, it silently return a list
             raise TypeError(f"`emohawk` returned {type(ds)} instead of a xr.Dataset")
