@@ -17,7 +17,7 @@ dependencies:
 - fsspec
 - geopandas
 - joblib
-- libnetcdf != 4.9.1
+- libnetcdf
 - matplotlib
 - netCDF4
 - numpy
@@ -37,7 +37,7 @@ dependencies:
 - tqdm
 - typing_extensions
 - xarray
-- xesmf >= 0.7.0
+- xesmf
 - xskillscore
 - pip:
   - cacholote
