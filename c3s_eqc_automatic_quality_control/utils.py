@@ -81,7 +81,7 @@ def regionalise(
         return obj.where(mask.compute(), drop=True)
 
     # Convert longitude
-    lon_limits = xr.DataArray([lon_slice.start, lon_slice.stop], dims=lon_name)
+    lon_limits = xr.DataArray([lon_slice.start, lon_slice.stop], dims=(lon_name,))
     lon_limits = lon_limits.dropna(lon_name)
     sort = False
     if lon_limits.min() < 0 and obj[lon_name].max() > 180:
@@ -99,7 +99,9 @@ def regionalise(
         bounds = obj[name][[0, -1]]
         ascending_bounds = bool(bounds.diff(name) > 0)
         ascending_slice = bool(
-            xr.DataArray([slice.start, slice.stop], dims=name).fillna(bounds).diff(name)
+            xr.DataArray([slice.start, slice.stop], dims=(name,))
+            .fillna(bounds)
+            .diff(name)
             > 0
         )
         if ascending_bounds is not ascending_slice:
