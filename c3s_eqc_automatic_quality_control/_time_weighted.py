@@ -86,7 +86,7 @@ class TimeWeighted:
         return self.obj.polyfit(**kwargs)
 
     def linear_trend(
-        self, p_value: bool = False, rmse: bool = False, **kwargs: Any
+        self, p_value: bool = False, r2: bool = False, **kwargs: Any
     ) -> dict[str, xr.DataArray | xr.Dataset]:
         coeff = self.polyfit(deg=1, **kwargs)
         if isinstance(self.obj, xr.DataArray):
@@ -108,7 +108,7 @@ class TimeWeighted:
             )
         obj_trend = coeff.sel(degree=1, drop=True)
         output = {"linear_trend": obj_trend}
-        if not (p_value or rmse):
+        if not (p_value or r2):
             return output
 
         dim = kwargs.get("dim", self.time.name)
@@ -121,8 +121,8 @@ class TimeWeighted:
         }
         if p_value:
             output["p_value"] = xs.pearson_r_p_value(self.obj, fit, **xs_kwargs)
-        if rmse:
-            output["rmse"] = xs.rmse(self.obj, fit, **xs_kwargs)
+        if r2:
+            output["r2"] = xs.r2(self.obj, fit, **xs_kwargs)
         return output
 
     def coverage(self, **kwargs: Any) -> xr.DataArray | xr.Dataset:

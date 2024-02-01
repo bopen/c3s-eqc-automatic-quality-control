@@ -162,7 +162,7 @@ class TestTimeWeighted:
         self, obj: xr.DataArray | xr.Dataset, weights: bool
     ) -> None:
         actual_dict = diagnostics.time_weighted_linear_trend(
-            obj, weights=weights, p_value=True, rmse=True
+            obj, weights=weights, p_value=True, r2=True
         )
         assert isinstance(actual_dict, dict)
 
@@ -183,7 +183,7 @@ class TestTimeWeighted:
                 obj, weights=weights
             ),
             "p_value": xs.pearson_r_p_value(obj, fit, "time", weights=da_weights),
-            "rmse": xs.rmse(obj, fit, "time", weights=da_weights),
+            "r2": xs.r2(obj, fit, "time", weights=da_weights),
         }
         assert set(actual_dict) == set(expected_dict)
         for key in actual_dict:

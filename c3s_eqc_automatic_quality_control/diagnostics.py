@@ -105,7 +105,7 @@ def time_weighted_linear_trend(
     time_name: Hashable | None = None,
     weights: xr.DataArray | bool = True,
     p_value: bool = False,
-    rmse: bool = False,
+    r2: bool = False,
     **kwargs: Any,
 ) -> xr.DataArray | xr.Dataset | dict[str, xr.DataArray | xr.Dataset]:
     """
@@ -124,8 +124,8 @@ def time_weighted_linear_trend(
         - DataArray: custom weights
     p_value: bool, default: False
         Whether to compute 2-tailed Pearson p-value
-    rmse: bool, default: False
-        Whether to compute rmse
+    r2: bool, default: False
+        Whether to compute r2 score
 
     Returns
     -------
@@ -133,27 +133,18 @@ def time_weighted_linear_trend(
         Reduced object or dict (linear_trend, p_value, rmse)
     """
     output = _time_weighted.TimeWeighted(obj, time_name, weights).linear_trend(
-        p_value=p_value, rmse=rmse, **kwargs
+        p_value=p_value, r2=r2, **kwargs
     )
     output["linear_trend"] *= 1.0e9  # 1/ns to 1/s
 
-    def attrs_func_linear(attrs: dict[str, Any]) -> dict[str, Any]:
+    def attrs_func(attrs: dict[str, Any]) -> dict[str, Any]:
         return {
             "long_name": f"Linear trend of {attrs.get('long_name', '')}",
             "units": f"{attrs.get('units', '')} s-1",
         }
 
-    def attrs_func_rmse(attrs: dict[str, Any]) -> dict[str, Any]:
-        return {
-            "units": f"{attrs.get('units', '')}",
-        }
-
-    output["linear_trend"] = _apply_attrs_func(
-        output["linear_trend"], obj, attrs_func_linear
-    )
-    if "rmse" in output:
-        output["rmse"] = _apply_attrs_func(output["rmse"], obj, attrs_func_rmse)
-    return output["linear_trend"] if not (p_value or rmse) else output
+    output["linear_trend"] = _apply_attrs_func(output["linear_trend"], obj, attrs_func)
+    return output["linear_trend"] if not (p_value or r2) else output
 
 
 def time_weighted_mean(
