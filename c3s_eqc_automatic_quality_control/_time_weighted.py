@@ -86,8 +86,8 @@ class TimeWeighted:
         return self.obj.polyfit(**kwargs)
 
     def linear_trend(
-        self, p_value: bool = False, **kwargs: Any
-    ) -> tuple[xr.DataArray | xr.Dataset, ...]:
+        self, p_value: bool = False, rmse: bool = False, **kwargs: Any
+    ) -> dict[str, xr.DataArray | xr.Dataset]:
         coeff = self.polyfit(deg=1, **kwargs)
         if isinstance(self.obj, xr.DataArray):
             coeff = coeff["polyfit_coefficients"]
@@ -107,20 +107,23 @@ class TimeWeighted:
                 }
             )
         obj_trend = coeff.sel(degree=1, drop=True)
-        if not p_value:
-            return (obj_trend,)
+        output = {"linear_trend": obj_trend}
+        if not (p_value or rmse):
+            return output
 
         dim = kwargs.get("dim", self.time.name)
         weights = kwargs.get("w", self.obj_weighted.weights if self.weights else None)
         fit = xr.polyval(self.obj[dim], coeff)
-        obj_p_value = xs.pearson_r_p_value(
-            self.obj,
-            fit,
-            dim=dim,
-            weights=weights,
+        xs_kwargs = {
+            "dim": dim,
+            "weights": weights,
             **{k: v for k, v in kwargs.items() if k == "skipna"},
-        )
-        return (obj_trend, obj_p_value)
+        }
+        if p_value:
+            output["p_value"] = xs.pearson_r_p_value(self.obj, fit, **xs_kwargs)
+        if rmse:
+            output["rmse"] = xs.rmse(self.obj, fit, **xs_kwargs)
+        return output
 
     def coverage(self, **kwargs: Any) -> xr.DataArray | xr.Dataset:
         if "dim" not in kwargs:

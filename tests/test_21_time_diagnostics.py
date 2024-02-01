@@ -158,12 +158,13 @@ class TestTimeWeighted:
                 ds_trend.rename(Tair_polyfit_coefficients="Tair"), actual
             )
 
-    def test_time_weighted_p_value(
+    def test_time_weighted_linear_trend_stats(
         self, obj: xr.DataArray | xr.Dataset, weights: bool
     ) -> None:
-        actual_tuple = diagnostics.time_weighted_linear_trend(
-            obj, weights=weights, p_value=True
+        actual_dict = diagnostics.time_weighted_linear_trend(
+            obj, weights=weights, p_value=True, rmse=True
         )
+        assert isinstance(actual_dict, dict)
 
         da_weights = obj["time"].dt.days_in_month if weights else None
         coeff = obj.polyfit(dim="time", deg=1, w=da_weights)
@@ -177,12 +178,16 @@ class TestTimeWeighted:
                 }
             )
         fit = xr.polyval(obj["time"], coeff)
-        expected_tuple = (
-            diagnostics.time_weighted_linear_trend(obj, weights=weights),
-            xs.pearson_r_p_value(obj, fit, "time", weights=da_weights),
-        )
-        for actual, expected in zip(actual_tuple, expected_tuple):
-            xr.testing.assert_identical(actual, expected)
+        expected_dict = {
+            "linear_trend": diagnostics.time_weighted_linear_trend(
+                obj, weights=weights
+            ),
+            "p_value": xs.pearson_r_p_value(obj, fit, "time", weights=da_weights),
+            "rmse": xs.rmse(obj, fit, "time", weights=da_weights),
+        }
+        assert set(actual_dict) == set(expected_dict)
+        for key in actual_dict:
+            xr.testing.assert_identical(actual_dict[key], actual_dict[key])
 
     def test_time_weighted_coverage(
         self, obj: xr.DataArray | xr.Dataset, weights: bool

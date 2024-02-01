@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    - uses: actions/setup-python@v4
+    - uses: actions/setup-python@v5
       with:
         python-version: 3.x
     - uses: pre-commit/action@v3.0.0
@@ -33,7 +33,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - uses: actions/setup-python@v4
+    - uses: actions/setup-python@v5
       with:
         python-version: 3.x
     - name: Install conda-merge
@@ -44,7 +44,7 @@ jobs:
         for SUFFIX in ci integration; do
         conda-merge ci/environment-$SUFFIX.yml environment.yml > ci/combined-environment-$SUFFIX.yml || exit
         done
-    - uses: actions/upload-artifact@v3
+    - uses: actions/upload-artifact@v4
       with:
         name: combined-environments
         path: ci/combined-environment-*.yml
@@ -59,7 +59,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - uses: actions/download-artifact@v3
+    - uses: actions/download-artifact@v4
       with:
         name: combined-environments
         path: ci
@@ -88,7 +88,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - uses: actions/download-artifact@v3
+    - uses: actions/download-artifact@v4
       with:
         name: combined-environments
         path: ci
@@ -117,7 +117,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - uses: actions/download-artifact@v3
+    - uses: actions/download-artifact@v4
       with:
         name: combined-environments
         path: ci
@@ -154,7 +154,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - uses: actions/download-artifact@v3
+    - uses: actions/download-artifact@v4
       with:
         name: combined-environments
         path: ci
@@ -189,7 +189,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - uses: actions/setup-python@v4
+    - uses: actions/setup-python@v5
       with:
         python-version: '3.11'
     - name: Install package
@@ -206,7 +206,7 @@ jobs:
         python -m twine check --strict * || exit
         python -c "import c3s_eqc_automatic_quality_control" || exit
         cd ..
-    - uses: actions/upload-artifact@v3
+    - uses: actions/upload-artifact@v4
       with:
         name: distribution
         path: dist
@@ -226,7 +226,7 @@ jobs:
       id-token: write  # IMPORTANT: this permission is mandatory for trusted publish
 
     steps:
-    - uses: actions/download-artifact@v3
+    - uses: actions/download-artifact@v4
       with:
         name: distribution
         path: dist
