@@ -18,7 +18,6 @@ This module manages the execution of the quality control.
 # limitations under the License.
 
 import calendar
-import fnmatch
 import functools
 import itertools
 import pathlib
@@ -26,24 +25,18 @@ from collections.abc import Callable
 from typing import Any
 
 import cacholote
-import cads_toolbox
 import cf_xarray  # noqa: F401
 import cgul
-import emohawk.readers.directory
+import earthkit.data
+import fsspec
+import fsspec.implementations.local
 import joblib
 import pandas as pd
 import tqdm
 import xarray as xr
 
-cads_toolbox.config.USE_CACHE = True
-
 N_JOBS = 1
 INVALIDATE_CACHE = False
-# TODO: This kwargs should somehow be handle upstream by the toolbox.
-TO_XARRAY_KWARGS: dict[str, Any] = {
-    "pandas_read_csv_kwargs": {"comment": "#"},
-}
-
 _SORTED_REQUEST_PARAMETERS = ("area", "grid")
 
 
@@ -293,28 +286,32 @@ def ensure_request_gets_cached(request: dict[str, Any]) -> dict[str, Any]:
     return cacheable_request
 
 
-def _cached_retrieve(collection_id: str, request: dict[str, Any]) -> emohawk.Data:
+@cacholote.cacheable
+def _cached_retrieve(
+    collection_id: str, request: dict[str, Any]
+) -> list[fsspec.implementations.local.LocalFileOpener]:
+    ds = earthkit.data.from_source("cds", collection_id, request)
+    if hasattr(ds, "path"):
+        paths = [ds.path]
+    else:
+        paths = [index for index in ds._indexes]
+    return [open(path, "br") for path in paths]
+
+
+def retrieve(collection_id: str, request: dict[str, Any]) -> list[str]:
     with cacholote.config.set(return_cache_entry=False):
-        return cads_toolbox.catalogue.retrieve(collection_id, request).data
+        return [file.path for file in _cached_retrieve(collection_id, request)]
 
 
 def get_sources(
     collection_id: str,
     request_list: list[dict[str, Any]],
-    exclude: list[str] = ["*.png", "*.json"],
 ) -> list[str]:
-    source: set[str] = set()
+    sources: set[str] = set()
 
     for request in tqdm.tqdm(request_list, disable=len(request_list) <= 1):
-        data = _cached_retrieve(collection_id, request)
-        if content := getattr(data, "_content", None):
-            source.update(map(str, content))
-        else:
-            source.add(str(data.source))
-
-    for pattern in exclude:
-        source -= set(fnmatch.filter(source, pattern))
-    return list(source)
+        sources.update(retrieve(collection_id, request))
+    return list(sources)
 
 
 def _set_bound_coords(ds: xr.Dataset) -> xr.Dataset:
@@ -393,16 +390,6 @@ def _preprocess(
     return harmonise(ds, collection_id)
 
 
-def get_data(source: list[str]) -> Any:
-    if len(source) == 1:
-        return emohawk.open(source[0])
-
-    # TODO: emohawk not able to open a list of files
-    emohwak_dir = emohawk.readers.directory.DirectoryReader("")
-    emohwak_dir._content = source
-    return emohwak_dir
-
-
 def _download_and_transform_requests(
     collection_id: str,
     request_list: list[dict[str, Any]],
@@ -410,40 +397,17 @@ def _download_and_transform_requests(
     transform_func_kwargs: dict[str, Any],
     **open_mfdataset_kwargs: Any,
 ) -> xr.Dataset:
-    # TODO: Ideally, we would always use emohawk.
-    # However, there is not a consistent behavior across backends.
-    # For example, GRIB silently ignore open_mfdataset_kwargs
     sources = get_sources(collection_id, request_list)
-    try:
-        engine = open_mfdataset_kwargs.get(
-            "engine",
-            {xr.backends.plugins.guess_engine(source) for source in sources},
-        )
-        use_emohawk = len(engine) != 1
-    except ValueError:
-        use_emohawk = True
-
     open_mfdataset_kwargs["preprocess"] = functools.partial(
         _preprocess,
         collection_id=collection_id,
         preprocess=open_mfdataset_kwargs.get("preprocess", None),
     )
-
-    if use_emohawk:
-        data = get_data(sources)
-        if isinstance(data, emohawk.readers.shapefile.ShapefileReader):
-            # FIXME: emohawk NotImplementedError
-            ds: xr.Dataset = data.to_pandas().to_xarray()
-        else:
-            ds = data.to_xarray(
-                xarray_open_mfdataset_kwargs=open_mfdataset_kwargs,
-                **TO_XARRAY_KWARGS,
-            )
-        if not isinstance(ds, xr.Dataset):
-            # When emohawk fails to concat, it silently return a list
-            raise TypeError(f"`emohawk` returned {type(ds)} instead of a xr.Dataset")
-    else:
-        ds = xr.open_mfdataset(sources, **open_mfdataset_kwargs)
+    ds = earthkit.data.from_source("file", sources).to_xarray(
+        xarray_open_mfdataset_kwargs=open_mfdataset_kwargs
+    )
+    if not isinstance(ds, xr.Dataset):
+        raise TypeError(f"`earthkit.data` returned {type(ds)} instead of a xr.Dataset")
 
     if transform_func is not None:
         with cacholote.config.set(return_cache_entry=False):
@@ -464,7 +428,7 @@ def _delayed_download(
     collection_id: str, request: dict[str, Any], config: cacholote.config.Settings
 ) -> None:
     with cacholote.config.set(**dict(config)):
-        _cached_retrieve(collection_id, request)
+        retrieve(collection_id, request)
 
 
 def download_and_transform(
