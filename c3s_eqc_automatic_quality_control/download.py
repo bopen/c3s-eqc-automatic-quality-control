@@ -291,7 +291,10 @@ def _cached_retrieve(
     collection_id: str, request: dict[str, Any]
 ) -> list[fsspec.implementations.local.LocalFileOpener]:
     ds = earthkit.data.from_source("cds", collection_id, request)
-    paths = [ds.path] if hasattr(ds, "path") else [index.path for index in ds._indexes]
+    if hasattr(ds, "path"):
+        paths = [ds.path]
+    else:
+        paths = [index.path for index in ds._indexes]
     return [open(path, "br") for path in paths]
 
 
