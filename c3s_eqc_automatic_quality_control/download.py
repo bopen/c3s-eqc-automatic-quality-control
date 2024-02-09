@@ -514,6 +514,13 @@ def download_and_transform(
     for request in ensure_list(requests):
         request_list.extend(split_request(request, chunks, split_all))
 
+    if invalidate_cache and not use_cache:
+        # Delete raw data
+        for request in request_list:
+            cacholote.delete(
+                _cached_retrieve, collection_id=collection_id, request=request
+            )
+
     if n_jobs != 1:
         # Download all data in parallel
         joblib.Parallel(n_jobs=n_jobs)(
