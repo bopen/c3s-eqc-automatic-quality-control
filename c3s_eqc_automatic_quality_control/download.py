@@ -295,11 +295,15 @@ def _cached_retrieve(
         paths = [ds.path]
     else:
         paths = [index.path for index in ds._indexes]
-    return [open(path, "br") for path in paths]
+    fs = fsspec.filesystem("file")
+    return [fs.open(path) for path in paths]
 
 
 def retrieve(collection_id: str, request: dict[str, Any]) -> list[str]:
-    with cacholote.config.set(return_cache_entry=False):
+    with cacholote.config.set(
+        return_cache_entry=False,
+        io_delete_original=True,
+    ):
         return [file.path for file in _cached_retrieve(collection_id, request)]
 
 
