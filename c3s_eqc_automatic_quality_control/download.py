@@ -286,17 +286,24 @@ def ensure_request_gets_cached(request: dict[str, Any]) -> dict[str, Any]:
     return cacheable_request
 
 
+def get_paths(sources: list[Any]) -> list[str]:
+    paths = []
+    for source in sources:
+        if hasattr(source, "path"):
+            paths.append(source.path)
+        else:
+            paths.extend([index.path for index in source._indexes])
+    return paths
+
+
 @cacholote.cacheable
 def _cached_retrieve(
     collection_id: str, request: dict[str, Any]
 ) -> list[fsspec.implementations.local.LocalFileOpener]:
     ds = earthkit.data.from_source("cds", collection_id, request)
-    if hasattr(ds, "path"):
-        paths = [ds.path]
-    else:
-        paths = [index.path for index in ds._indexes]
+    sources = ds.sources if hasattr(ds, "sources") else [ds]
     fs = fsspec.filesystem("file")
-    return [fs.open(path) for path in paths]
+    return [fs.open(path) for path in get_paths(sources)]
 
 
 def retrieve(collection_id: str, request: dict[str, Any]) -> list[str]:
@@ -312,7 +319,6 @@ def get_sources(
     request_list: list[dict[str, Any]],
 ) -> list[str]:
     sources: set[str] = set()
-
     for request in tqdm.tqdm(request_list, disable=len(request_list) <= 1):
         sources.update(retrieve(collection_id, request))
     return list(sources)
