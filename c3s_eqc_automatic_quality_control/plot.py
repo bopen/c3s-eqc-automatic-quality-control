@@ -84,9 +84,9 @@ def shaded_std(
     colors = iter(colors)
 
     if hue_dim:
-        _, means = zip(*ds_mean.groupby(hue_dim))
+        _, means = zip(*ds_mean.groupby(hue_dim, squeeze=False))
         if ds_std:
-            _, stds = zip(*ds_std.groupby(hue_dim))
+            _, stds = zip(*ds_std.groupby(hue_dim, squeeze=False))
         else:
             stds = tuple(xr.Dataset() for _ in range(len(means)))
     else:
@@ -250,7 +250,7 @@ def projected_map(
             txt = "\n".join(
                 [
                     f"{k:>{n_characters}}: {v.squeeze().values:+e}{units}"
-                    for k, v in da_stats.groupby("diagnostic")
+                    for k, v in da_stats.groupby("diagnostic", squeeze=False)
                 ]
             )
             plt.figtext(
@@ -455,4 +455,4 @@ def seasonal_boxplot(
     da = da.stack(stacked_dim=da.dims)
     df = da.to_dataframe()
 
-    return df.groupby(by=da[time_dim].dt.season.values).boxplot(**kwargs)
+    return df.groupby(by=da[time_dim].dt.season.values, squeeze=False).boxplot(**kwargs)
