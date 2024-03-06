@@ -300,7 +300,7 @@ def get_paths(sources: list[Any]) -> list[str]:
 def _cached_retrieve(
     collection_id: str, request: dict[str, Any]
 ) -> list[fsspec.implementations.local.LocalFileOpener]:
-    ds = earthkit.data.from_source("cds", collection_id, request)
+    ds = earthkit.data.from_source("cds", collection_id, request, prompt=False)
     sources = ds.sources if hasattr(ds, "sources") else [ds]
     fs = fsspec.filesystem("file")
     return [fs.open(path) for path in get_paths(sources)]
