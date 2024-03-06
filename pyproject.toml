@@ -32,9 +32,10 @@ ignore_missing_imports = true
 module = [
   "cads_toolbox",
   "cartopy.*",
+  "cdsapi",
   "cgul",
-  "emohawk.*",
-  "fsspec",
+  "earthkit.*",
+  "fsspec.*",
   "joblib",
   "plotly.*",
   "shapely",

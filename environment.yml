@@ -14,6 +14,7 @@ dependencies:
 - cf-units
 - cf_xarray
 - dask
+- earthkit-data
 - fsspec
 - geopandas
 - joblib
@@ -41,7 +42,5 @@ dependencies:
 - xskillscore
 - pip:
   - cacholote
-  - cads-toolbox
   - cgul
-  - emohawk
   - kaleido
