@@ -19,6 +19,7 @@ dependencies:
 - geopandas
 - joblib
 - libnetcdf
+- markdown
 - matplotlib
 - netCDF4
 - numpy
