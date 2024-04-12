@@ -30,6 +30,7 @@ import cads_toolbox
 import cf_xarray  # noqa: F401
 import cgul
 import emohawk.readers.directory
+import emohawk.readers.shapefile
 import joblib
 import pandas as pd
 import tqdm
