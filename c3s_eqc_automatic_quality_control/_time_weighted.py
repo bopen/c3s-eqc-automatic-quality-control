@@ -145,8 +145,7 @@ def map_func(
     time_name: str,
     func: str,
     **kwargs: Any,
-) -> xr.DataArray:
-    ...
+) -> xr.DataArray: ...
 
 
 @overload
@@ -155,8 +154,7 @@ def map_func(
     time_name: str,
     func: str,
     **kwargs: Any,
-) -> xr.Dataset:
-    ...
+) -> xr.Dataset: ...
 
 
 def map_func(

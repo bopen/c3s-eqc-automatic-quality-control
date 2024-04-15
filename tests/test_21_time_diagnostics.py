@@ -9,13 +9,11 @@ from c3s_eqc_automatic_quality_control import diagnostics
 
 
 @overload
-def weighted_mean(obj: xr.DataArray) -> xr.DataArray:
-    ...
+def weighted_mean(obj: xr.DataArray) -> xr.DataArray: ...
 
 
 @overload
-def weighted_mean(obj: xr.Dataset) -> xr.Dataset:
-    ...
+def weighted_mean(obj: xr.Dataset) -> xr.Dataset: ...
 
 
 def weighted_mean(obj: xr.DataArray | xr.Dataset) -> xr.DataArray | xr.Dataset:
@@ -25,13 +23,11 @@ def weighted_mean(obj: xr.DataArray | xr.Dataset) -> xr.DataArray | xr.Dataset:
 
 
 @overload
-def weighted_std(obj: xr.DataArray) -> xr.DataArray:
-    ...
+def weighted_std(obj: xr.DataArray) -> xr.DataArray: ...
 
 
 @overload
-def weighted_std(obj: xr.Dataset) -> xr.Dataset:
-    ...
+def weighted_std(obj: xr.Dataset) -> xr.Dataset: ...
 
 
 def weighted_std(obj: xr.DataArray | xr.Dataset) -> xr.DataArray | xr.Dataset:
