@@ -31,6 +31,7 @@ import plotly.express as px
 import plotly.graph_objs as go
 import xarray as xr
 from cartopy.mpl.geocollection import GeoQuadMesh
+from cartopy.mpl.gridliner import Gridliner
 from matplotlib.typing import ColorType
 from xarray.plot.facetgrid import FacetGrid
 
@@ -84,9 +85,9 @@ def shaded_std(
     colors = iter(colors)
 
     if hue_dim:
-        _, means = zip(*ds_mean.groupby(hue_dim))
+        _, means = zip(*ds_mean.groupby(hue_dim, squeeze=False))
         if ds_std:
-            _, stds = zip(*ds_std.groupby(hue_dim))
+            _, stds = zip(*ds_std.groupby(hue_dim, squeeze=False))
         else:
             stds = tuple(xr.Dataset() for _ in range(len(means)))
     else:
@@ -218,11 +219,13 @@ def projected_map(
             ax.gridlines(draw_labels=False)
 
         for ax in plot_obj.axs[-1, :]:
-            for gl in ax._gridliners:
+            gridliners = [a for a in ax.artists if isinstance(a, Gridliner)]
+            for gl in gridliners:
                 gl.bottom_labels = True
 
         for ax in plot_obj.axs[:, 0]:
-            for gl in ax._gridliners:
+            gridliners = [a for a in ax.artists if isinstance(a, Gridliner)]
+            for gl in gridliners:
                 gl.left_labels = True
 
         if show_stats:
@@ -231,7 +234,8 @@ def projected_map(
             )
     else:
         plot_obj.axes.coastlines()
-        if not getattr(plot_obj.axes, "_gridliners", []):
+        gridliners = [a for a in plot_obj.axes.artists if isinstance(a, Gridliner)]
+        if not gridliners:
             gl = plot_obj.axes.gridlines(draw_labels=True)
             gl.top_labels = gl.right_labels = False
 
@@ -250,7 +254,7 @@ def projected_map(
             txt = "\n".join(
                 [
                     f"{k:>{n_characters}}: {v.squeeze().values:+e}{units}"
-                    for k, v in da_stats.groupby("diagnostic")
+                    for k, v in da_stats.groupby("diagnostic", squeeze=False)
                 ]
             )
             plt.figtext(
@@ -454,5 +458,4 @@ def seasonal_boxplot(
 
     da = da.stack(stacked_dim=da.dims)
     df = da.to_dataframe()
-
     return df.groupby(by=da[time_dim].dt.season.values).boxplot(**kwargs)

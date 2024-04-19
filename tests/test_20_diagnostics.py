@@ -31,7 +31,7 @@ class TestDiagnostics:
         fs, dirname = cacholote.utils.get_cache_files_fs_dirname()
         assert fs.ls(dirname) == []  # cache is empty
 
-        for _, obj in obj.isel(time=slice(2)).groupby("time"):
+        for _, obj in obj.isel(time=slice(2)).groupby("time", squeeze=False):
             expected = obj.isel(longitude=slice(10), latitude=slice(10))
             actual = diagnostics.regrid(obj, expected, "nearest_s2d")
             xr.testing.assert_equal(actual, expected)

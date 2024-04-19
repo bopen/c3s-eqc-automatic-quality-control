@@ -115,8 +115,6 @@ def test_spatial_weighted_rmse_against_sklearn() -> None:
 
     da1 = da
     da2 = da**2
-    expected = sklearn.metrics.mean_squared_error(
-        da1, da2, sample_weight=weights, squared=False
-    )
+    expected = sklearn.metrics.root_mean_squared_error(da1, da2, sample_weight=weights)
     actual = diagnostics.spatial_weighted_rmse(da1, da2)
     assert expected == actual.values

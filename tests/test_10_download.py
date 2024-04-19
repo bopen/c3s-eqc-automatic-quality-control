@@ -21,17 +21,31 @@ AIR_TEMPERATURE_REQUEST = (
 )
 
 
+class MockResult:
+    def __init__(self, name: str, request: dict[str, Any]) -> None:
+        self.name = name
+        self.request = request
+
+    @property
+    def location(self) -> str:
+        return tempfile.NamedTemporaryFile(suffix=".nc", delete=False).name
+
+    def download(self, target: str | pathlib.Path | None = None) -> str | pathlib.Path:
+        ds = xr.tutorial.open_dataset(self.name).sel(**self.request)
+        ds.to_netcdf(path := target or self.location)
+        return path
+
+
 def mock_retrieve(
     self: cdsapi.Client,
     name: str,
     request: dict[str, Any],
     target: str | pathlib.Path | None = None,
 ) -> fsspec.spec.AbstractBufferedFile:
-    ds = xr.tutorial.open_dataset(name).sel(**request)
+    result = MockResult(name, request)
     if target is None:
-        target = tempfile.NamedTemporaryFile(suffix=".nc", delete=False).name
-    ds.to_netcdf(target)
-    return target
+        return result
+    return result.download(target)
 
 
 @pytest.mark.parametrize(

@@ -59,7 +59,9 @@ class TimeWeighted:
         obj = self.obj
         if isinstance(self.obj_weighted, (DataArrayWeighted | DatasetWeighted)):
             obj = obj.assign_coords(__weights__=self.obj_weighted.weights)
-        return obj.groupby(group).map(map_func, (time_name, func_name), **kwargs)
+        return obj.groupby(group, squeeze=False).map(
+            map_func, (time_name, func_name), **kwargs
+        )
 
     @utils.keep_attrs
     def reduce(
@@ -143,8 +145,7 @@ def map_func(
     time_name: str,
     func: str,
     **kwargs: Any,
-) -> xr.DataArray:
-    ...
+) -> xr.DataArray: ...
 
 
 @overload
@@ -153,8 +154,7 @@ def map_func(
     time_name: str,
     func: str,
     **kwargs: Any,
-) -> xr.Dataset:
-    ...
+) -> xr.Dataset: ...
 
 
 def map_func(
