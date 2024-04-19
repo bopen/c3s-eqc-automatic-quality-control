@@ -289,10 +289,8 @@ def ensure_request_gets_cached(request: dict[str, Any]) -> dict[str, Any]:
 def get_paths(sources: list[Any]) -> list[str]:
     paths = []
     for source in sources:
-        if hasattr(source, "path"):
-            paths.append(source.path)
-        else:
-            paths.extend([index.path for index in source._indexes])
+        indexes = getattr(source, "_indexes", [source])
+        paths.extend([index.path for index in indexes])
     return paths
 
 
