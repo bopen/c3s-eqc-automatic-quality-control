@@ -1,10 +1,6 @@
 import datetime
-import pathlib
-import tempfile
 from typing import Any
 
-import cdsapi
-import fsspec
 import pandas as pd
 import pytest
 import xarray as xr
@@ -19,33 +15,6 @@ AIR_TEMPERATURE_REQUEST = (
         "longitude": [-10, 2],
     },
 )
-
-
-class MockResult:
-    def __init__(self, name: str, request: dict[str, Any]) -> None:
-        self.name = name
-        self.request = request
-
-    @property
-    def location(self) -> str:
-        return tempfile.NamedTemporaryFile(suffix=".nc", delete=False).name
-
-    def download(self, target: str | pathlib.Path | None = None) -> str | pathlib.Path:
-        ds = xr.tutorial.open_dataset(self.name).sel(**self.request)
-        ds.to_netcdf(path := target or self.location)
-        return path
-
-
-def mock_retrieve(
-    self: cdsapi.Client,
-    name: str,
-    request: dict[str, Any],
-    target: str | pathlib.Path | None = None,
-) -> fsspec.spec.AbstractBufferedFile:
-    result = MockResult(name, request)
-    if target is None:
-        return result
-    return result.download(target)
 
 
 @pytest.mark.parametrize(
@@ -300,12 +269,9 @@ def test_ensure_request_gets_cached() -> None:
     ],
 )
 def test_download_no_transform(
-    monkeypatch: pytest.MonkeyPatch,
     chunks: dict[str, int],
     dask_chunks: dict[str, tuple[int, ...]],
 ) -> None:
-    monkeypatch.setattr(cdsapi.Client, "retrieve", mock_retrieve)
-
     ds = download.download_and_transform(*AIR_TEMPERATURE_REQUEST, chunks=chunks)
     assert dict(ds.chunks) == dask_chunks
 
@@ -318,12 +284,9 @@ def test_download_no_transform(
     ],
 )
 def test_download_and_transform(
-    monkeypatch: pytest.MonkeyPatch,
     transform_chunks: bool,
     dask_chunks: dict[str, tuple[int, ...]],
 ) -> None:
-    monkeypatch.setattr(cdsapi.Client, "retrieve", mock_retrieve)
-
     def transform_func(ds: xr.Dataset) -> xr.Dataset:
         return ds.round().mean(("longitude", "latitude"))
 
@@ -339,11 +302,7 @@ def test_download_and_transform(
 
 @pytest.mark.parametrize("transform_chunks", [True, False])
 @pytest.mark.parametrize("invalidate_cache", [True, False])
-def test_invalidate_cache(
-    monkeypatch: pytest.MonkeyPatch, transform_chunks: bool, invalidate_cache: bool
-) -> None:
-    monkeypatch.setattr(cdsapi.Client, "retrieve", mock_retrieve)
-
+def test_invalidate_cache(transform_chunks: bool, invalidate_cache: bool) -> None:
     def transform_func(ds: xr.Dataset) -> xr.Dataset:
         return ds * 0
 
