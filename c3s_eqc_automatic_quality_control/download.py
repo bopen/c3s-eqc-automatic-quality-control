@@ -427,9 +427,17 @@ def _download_and_transform_requests(
         collection_id=collection_id,
         preprocess=open_mfdataset_kwargs.get("preprocess", None),
     )
-    ds = earthkit.data.from_source("file", sources).to_xarray(
-        xarray_open_mfdataset_kwargs=open_mfdataset_kwargs
-    )
+    try:
+        ds = earthkit.data.from_source("file", sources).to_xarray(
+            xarray_open_mfdataset_kwargs=open_mfdataset_kwargs
+        )
+    except TypeError:
+        # https://github.com/ecmwf/earthkit-data/issues/374
+        postprocess = open_mfdataset_kwargs.pop("preprocess")
+        ds = earthkit.data.from_source("file", sources).to_xarray(
+            xarray_open_dataset_kwargs=open_mfdataset_kwargs | {"chunks": {}}
+        )
+        ds = postprocess(ds)
     if not isinstance(ds, xr.Dataset):
         raise TypeError(f"`earthkit.data` returned {type(ds)} instead of a xr.Dataset")
 
