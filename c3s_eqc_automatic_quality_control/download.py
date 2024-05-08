@@ -36,6 +36,7 @@ import joblib
 import pandas as pd
 import tqdm
 import xarray as xr
+from earthkit.data.readers.grib.index import GribFieldList
 
 N_JOBS = 1
 INVALIDATE_CACHE = False
@@ -422,22 +423,21 @@ def _download_and_transform_requests(
     **open_mfdataset_kwargs: Any,
 ) -> xr.Dataset:
     sources = get_sources(collection_id, request_list)
-    open_mfdataset_kwargs["preprocess"] = functools.partial(
+    preprocess = functools.partial(
         _preprocess,
         collection_id=collection_id,
         preprocess=open_mfdataset_kwargs.get("preprocess", None),
     )
-    try:
-        ds = earthkit.data.from_source("file", sources).to_xarray(
-            xarray_open_mfdataset_kwargs=open_mfdataset_kwargs
-        )
-    except TypeError:
+    earthkit_ds = earthkit.data.from_source("file", sources)
+    if isinstance(earthkit_ds, GribFieldList):
         # https://github.com/ecmwf/earthkit-data/issues/374
-        postprocess = open_mfdataset_kwargs.pop("preprocess")
-        ds = earthkit.data.from_source("file", sources).to_xarray(
-            xarray_open_dataset_kwargs=open_mfdataset_kwargs | {"chunks": {}}
-        )
-        ds = postprocess(ds)
+        # squeeze=True is cfgrib default
+        open_dataset_kwargs = {"chunks": {}, "squeeze": True} | open_mfdataset_kwargs
+        ds = earthkit_ds.to_xarray(xarray_open_dataset_kwargs=open_dataset_kwargs)
+        ds = preprocess(ds)
+    else:
+        open_mfdataset_kwargs["preprocess"] = preprocess
+        ds = earthkit_ds.to_xarray(xarray_open_mfdataset_kwargs=open_mfdataset_kwargs)
     if not isinstance(ds, xr.Dataset):
         raise TypeError(f"`earthkit.data` returned {type(ds)} instead of a xr.Dataset")
 
