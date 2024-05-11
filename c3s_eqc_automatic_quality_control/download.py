@@ -40,6 +40,7 @@ from earthkit.data.readers.grib.index import GribFieldList
 
 N_JOBS = 1
 INVALIDATE_CACHE = False
+NOCACHE = None
 _SORTED_REQUEST_PARAMETERS = ("area", "grid")
 
 
@@ -314,6 +315,8 @@ def get_paths(sources: list[Any]) -> list[str]:
 def _cached_retrieve(
     collection_id: str, request: dict[str, Any]
 ) -> list[fsspec.implementations.local.LocalFileOpener]:
+    if NOCACHE:
+        request = request | {"nocache": NOCACHE}
     ds = earthkit.data.from_source("cds", collection_id, request, prompt=False)
     sources = ds.sources if hasattr(ds, "sources") else [ds]
     fs = fsspec.filesystem("file")
