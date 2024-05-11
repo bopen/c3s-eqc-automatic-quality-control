@@ -19,6 +19,7 @@ This module manages the execution of the quality control.
 
 import calendar
 import contextlib
+import datetime
 import functools
 import itertools
 import os
@@ -40,7 +41,7 @@ from earthkit.data.readers.grib.index import GribFieldList
 
 N_JOBS = 1
 INVALIDATE_CACHE = False
-NOCACHE = None
+NOCACHE = False
 _SORTED_REQUEST_PARAMETERS = ("area", "grid")
 
 
@@ -316,7 +317,7 @@ def _cached_retrieve(
     collection_id: str, request: dict[str, Any]
 ) -> list[fsspec.implementations.local.LocalFileOpener]:
     if NOCACHE:
-        request = request | {"nocache": NOCACHE}
+        request = request | {"nocache": datetime.datetime.now().isoformat()}
     ds = earthkit.data.from_source("cds", collection_id, request, prompt=False)
     sources = ds.sources if hasattr(ds, "sources") else [ds]
     fs = fsspec.filesystem("file")
@@ -558,6 +559,7 @@ def download_and_transform(
             )
 
     if n_jobs != 1:
+        assert not NOCACHE, "n_jobs must be 1 when NOCACHE is True"
         # Download all data in parallel
         joblib.Parallel(n_jobs=n_jobs)(
             _delayed_download(collection_id, request, cacholote.config.get())
