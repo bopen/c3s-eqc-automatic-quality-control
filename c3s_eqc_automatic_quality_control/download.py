@@ -37,7 +37,9 @@ import joblib
 import pandas as pd
 import tqdm
 import xarray as xr
+from earthkit.data.readers.csv import CSVReader
 from earthkit.data.readers.grib.index import GribFieldList
+from earthkit.data.sources.file import File
 
 N_JOBS = 1
 INVALIDATE_CACHE = False
@@ -432,16 +434,19 @@ def _download_and_transform_requests(
         collection_id=collection_id,
         preprocess=open_mfdataset_kwargs.get("preprocess", None),
     )
-    earthkit_ds = earthkit.data.from_source("file", sources)
-    if isinstance(earthkit_ds, GribFieldList):
+    ek_ds = earthkit.data.from_source("file", sources)
+    if isinstance(ek_ds, GribFieldList):
         # https://github.com/ecmwf/earthkit-data/issues/374
         # squeeze=True is cfgrib default
         open_dataset_kwargs = {"chunks": {}, "squeeze": True} | open_mfdataset_kwargs
-        ds = earthkit_ds.to_xarray(xarray_open_dataset_kwargs=open_dataset_kwargs)
+        ds = ek_ds.to_xarray(xarray_open_dataset_kwargs=open_dataset_kwargs)
         ds = preprocess(ds)
+    elif isinstance(ek_ds, File) and isinstance(ek_ds._reader, CSVReader):
+        assert not open_mfdataset_kwargs
+        ds = preprocess(ek_ds.to_xarray())
     else:
         open_mfdataset_kwargs["preprocess"] = preprocess
-        ds = earthkit_ds.to_xarray(xarray_open_mfdataset_kwargs=open_mfdataset_kwargs)
+        ds = ek_ds.to_xarray(xarray_open_mfdataset_kwargs=open_mfdataset_kwargs)
     if not isinstance(ds, xr.Dataset):
         raise TypeError(f"`earthkit.data` returned {type(ds)} instead of a xr.Dataset")
 
