@@ -13,6 +13,26 @@ classifiers = [
   "Programming Language :: Python :: 3.11",
   "Topic :: Scientific/Engineering"
 ]
+dependencies = [
+  "cacholote",
+  "cads-toolbox",
+  "cartopy",
+  "cf-xarray",
+  "cgul",
+  "emohawk",
+  "fsspec",
+  "joblib",
+  "matplotlib",
+  "numpy",
+  "pandas",
+  "plotly",
+  "pyproj",
+  "shapely",
+  "tqdm",
+  "typing_extensions",
+  "xarray",
+  "xskillscore"
+]
 description = "C3S EQC Automatic Quality Control"
 dynamic = ["version"]
 license = {file = "LICENSE"}
