@@ -24,7 +24,7 @@ import pyproj
 import xarray as xr
 from xarray.core.common import DataWithCoords
 
-from . import _grid_cell_area, _regrid, _spatial_weighted, _time_weighted, utils
+from . import _grid_cell_area, _spatial_weighted, _time_weighted, utils
 
 __all__ = [
     "annual_weighted_mean",
@@ -90,6 +90,8 @@ def regrid(
     DataArray or Dataset
         Interpolated object
     """
+    from . import _regrid
+
     call_kwargs = {}
     for key in {"keep_attrs", "skipna", "na_thres", "output_chunks"} & set(kwargs):
         call_kwargs[key] = kwargs.pop(key)
