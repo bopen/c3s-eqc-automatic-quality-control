@@ -15,11 +15,10 @@ classifiers = [
 ]
 dependencies = [
   "cacholote",
-  "cads-toolbox",
   "cartopy",
   "cf-xarray",
   "cgul",
-  "emohawk",
+  "earthkit-data",
   "fsspec",
   "joblib",
   "matplotlib",
