@@ -15,6 +15,7 @@ dependencies:
 - cf_xarray
 - dask
 - earthkit-data >= 0.7.0
+- ecmwflibs
 - fsspec
 - geopandas
 - joblib
