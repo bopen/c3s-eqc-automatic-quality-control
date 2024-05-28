@@ -436,7 +436,7 @@ def _download_and_transform_requests(
     )
 
     if all(
-        isinstance(source, str) and (".grib", ".grb", ".grb1", ".grb2")
+        isinstance(source, str) and source.endswith((".grib", ".grb", ".grb1", ".grb2"))
         for source in sources
     ):
         open_mfdataset_kwargs["preprocess"] = preprocess
