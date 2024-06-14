@@ -9,11 +9,12 @@ channels:
 # DO NOT EDIT ABOVE THIS LINE, ADD DEPENDENCIES BELOW AS SHOWN IN THE EXAMPLE
 dependencies:
 - cartopy
-- cdsapi
+- cdsapi >= 0.7.0
 - cfgrib
 - cf-units
 - cf_xarray
 - dask
+- earthkit-data >= 0.7.0
 - fsspec
 - geopandas
 - joblib
@@ -41,7 +42,5 @@ dependencies:
 - xskillscore
 - pip:
   - cacholote
-  - cads-toolbox
   - cgul
-  - emohawk
   - kaleido

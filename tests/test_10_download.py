@@ -1,11 +1,9 @@
 import datetime
 from typing import Any
 
-import cads_toolbox
 import pandas as pd
 import pytest
 import xarray as xr
-from utils import mock_download
 
 from c3s_eqc_automatic_quality_control import download
 
@@ -271,12 +269,9 @@ def test_ensure_request_gets_cached() -> None:
     ],
 )
 def test_download_no_transform(
-    monkeypatch: pytest.MonkeyPatch,
     chunks: dict[str, int],
     dask_chunks: dict[str, tuple[int, ...]],
 ) -> None:
-    monkeypatch.setattr(cads_toolbox.catalogue, "_download", mock_download)
-
     ds = download.download_and_transform(*AIR_TEMPERATURE_REQUEST, chunks=chunks)
     assert dict(ds.chunks) == dask_chunks
 
@@ -289,12 +284,9 @@ def test_download_no_transform(
     ],
 )
 def test_download_and_transform(
-    monkeypatch: pytest.MonkeyPatch,
     transform_chunks: bool,
     dask_chunks: dict[str, tuple[int, ...]],
 ) -> None:
-    monkeypatch.setattr(cads_toolbox.catalogue, "_download", mock_download)
-
     def transform_func(ds: xr.Dataset) -> xr.Dataset:
         return ds.round().mean(("longitude", "latitude"))
 
@@ -310,11 +302,7 @@ def test_download_and_transform(
 
 @pytest.mark.parametrize("transform_chunks", [True, False])
 @pytest.mark.parametrize("invalidate_cache", [True, False])
-def test_invalidate_cache(
-    monkeypatch: pytest.MonkeyPatch, transform_chunks: bool, invalidate_cache: bool
-) -> None:
-    monkeypatch.setattr(cads_toolbox.catalogue, "_download", mock_download)
-
+def test_invalidate_cache(transform_chunks: bool, invalidate_cache: bool) -> None:
     def transform_func(ds: xr.Dataset) -> xr.Dataset:
         return ds * 0
 
