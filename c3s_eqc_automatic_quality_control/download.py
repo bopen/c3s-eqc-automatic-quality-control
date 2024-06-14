@@ -435,17 +435,25 @@ def _download_and_transform_requests(
         preprocess=open_mfdataset_kwargs.pop("preprocess", None),
     )
 
+    grib_ext = (".grib", ".grb", ".grb1", ".grb2")
+    ext_to_skip = (".png", ".json")
     if all(
-        isinstance(source, str) and source.endswith((".grib", ".grb", ".grb1", ".grb2"))
+        isinstance(source, str) and source.endswith(grib_ext + ext_to_skip)
         for source in sources
     ):
+        # TODO: Avoid memory issues
+        # https://github.com/ecmwf/earthkit-data/issues/378
+        # https://github.com/ecmwf/earthkit-data/issues/400
         open_mfdataset_kwargs["preprocess"] = preprocess
-        ds = xr.open_mfdataset(sources, **open_mfdataset_kwargs)
+        ds = xr.open_mfdataset(
+            [source for source in sources if not source.endswith(ext_to_skip)],
+            **open_mfdataset_kwargs,
+        )
     else:
         ek_ds = earthkit.data.from_source("file", sources)
         if isinstance(ek_ds, GribFieldList):
+            # TODO: squeeze=True is cfgrib default
             # https://github.com/ecmwf/earthkit-data/issues/374
-            # squeeze=True is cfgrib default
             open_dataset_kwargs = {
                 "chunks": {},
                 "squeeze": True,
