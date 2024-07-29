@@ -39,6 +39,7 @@ import tqdm
 import xarray as xr
 from earthkit.data.readers.csv import CSVReader
 from earthkit.data.readers.grib.index import GribFieldList
+from earthkit.data.readers.shapefile import ShapeFileReader
 from earthkit.data.sources.file import File
 
 N_JOBS = 1
@@ -321,7 +322,11 @@ def _cached_retrieve(
     if NOCACHE:
         request = request | {"nocache": datetime.datetime.now().isoformat()}
     ds = earthkit.data.from_source("cds", collection_id, request, prompt=False)
-    sources = ds.sources if hasattr(ds, "sources") else [ds]
+    if isinstance(ds, ShapeFileReader) and hasattr(ds._parent, "_path_and_parts"):
+        # Do not unzip vector data
+        sources = [ds._parent._path_and_parts]
+    else:
+        sources = ds.sources if hasattr(ds, "sources") else [ds]
     fs = fsspec.filesystem("file")
     return [fs.open(path) for path in get_paths(sources)]
 
@@ -460,7 +465,9 @@ def _download_and_transform_requests(
             } | open_mfdataset_kwargs
             ds = ek_ds.to_xarray(xarray_open_dataset_kwargs=open_dataset_kwargs)
             ds = preprocess(ds)
-        elif isinstance(ek_ds, File) and isinstance(ek_ds._reader, CSVReader):
+        elif (
+            isinstance(ek_ds, File) and isinstance(ek_ds._reader, CSVReader)
+        ) or isinstance(ek_ds, ShapeFileReader):
             assert not open_mfdataset_kwargs
             ds = preprocess(ek_ds.to_xarray())
         else:
