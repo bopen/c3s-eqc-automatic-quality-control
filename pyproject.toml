@@ -15,11 +15,11 @@ classifiers = [
 ]
 dependencies = [
   "cacholote",
-  "cads-toolbox",
   "cartopy",
   "cf-xarray",
   "cgul",
-  "emohawk",
+  "earthkit-data[cds]",
+  "ecmwflibs",
   "fsspec",
   "joblib",
   "matplotlib",
@@ -53,9 +53,10 @@ ignore_missing_imports = true
 module = [
   "cads_toolbox",
   "cartopy.*",
+  "cdsapi",
   "cgul",
-  "emohawk.*",
-  "fsspec",
+  "earthkit.*",
+  "fsspec.*",
   "joblib",
   "plotly.*",
   "shapely",

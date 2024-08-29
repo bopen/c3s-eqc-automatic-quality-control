@@ -19,7 +19,7 @@ This module manages the execution of the quality control.
 
 import calendar
 import contextlib
-import fnmatch
+import datetime
 import functools
 import itertools
 import os
@@ -28,25 +28,23 @@ from collections.abc import Callable, Iterator
 from typing import Any
 
 import cacholote
-import cads_toolbox
 import cf_xarray  # noqa: F401
 import cgul
-import emohawk.readers.directory
-import emohawk.readers.shapefile
+import earthkit.data
+import fsspec
+import fsspec.implementations.local
 import joblib
 import pandas as pd
 import tqdm
 import xarray as xr
-
-cads_toolbox.config.USE_CACHE = True
+from earthkit.data.readers.csv import CSVReader
+from earthkit.data.readers.grib.index import GribFieldList
+from earthkit.data.readers.shapefile import ShapeFileReader
+from earthkit.data.sources.file import File
 
 N_JOBS = 1
 INVALIDATE_CACHE = False
-# TODO: This kwargs should somehow be handle upstream by the toolbox.
-TO_XARRAY_KWARGS: dict[str, Any] = {
-    "pandas_read_csv_kwargs": {"comment": "#"},
-}
-
+NOCACHE = False
 _SORTED_REQUEST_PARAMETERS = ("area", "grid")
 
 
@@ -309,29 +307,47 @@ def ensure_request_gets_cached(request: dict[str, Any]) -> dict[str, Any]:
     return cacheable_request
 
 
-def _cached_retrieve(collection_id: str, request: dict[str, Any]) -> emohawk.Data:
-    with cacholote.config.set(return_cache_entry=False):
-        return cads_toolbox.catalogue.retrieve(collection_id, request).data
+def get_paths(sources: list[Any]) -> list[str]:
+    paths = []
+    for source in sources:
+        indexes = getattr(source, "_indexes", [source])
+        paths.extend([index.path for index in indexes])
+    return paths
+
+
+@cacholote.cacheable
+def _cached_retrieve(
+    collection_id: str, request: dict[str, Any]
+) -> list[fsspec.implementations.local.LocalFileOpener]:
+    if NOCACHE:
+        request = request | {"nocache": datetime.datetime.now().isoformat()}
+    ds = earthkit.data.from_source("cds", collection_id, request, prompt=False)
+    if isinstance(ds, ShapeFileReader) and hasattr(ds._parent, "_path_and_parts"):
+        # Do not unzip vector data
+        sources = [ds._parent._path_and_parts]
+    else:
+        sources = ds.sources if hasattr(ds, "sources") else [ds]
+    fs = fsspec.filesystem("file")
+    return [fs.open(path) for path in get_paths(sources)]
+
+
+def retrieve(collection_id: str, request: dict[str, Any]) -> list[str]:
+    with cacholote.config.set(
+        return_cache_entry=False,
+        io_delete_original=True,
+    ):
+        return [file.path for file in _cached_retrieve(collection_id, request)]
 
 
 def get_sources(
     collection_id: str,
     request_list: list[dict[str, Any]],
-    exclude: list[str] = ["*.png", "*.json"],
 ) -> list[str]:
-    source: set[str] = set()
-
+    sources: set[str] = set()
     disable = os.getenv("TQDM_DISABLE", "False") == "True"
     for request in tqdm.tqdm(request_list, disable=disable):
-        data = _cached_retrieve(collection_id, request)
-        if content := getattr(data, "_content", None):
-            source.update(map(str, content))
-        else:
-            source.add(str(data.source))
-
-    for pattern in exclude:
-        source -= set(fnmatch.filter(source, pattern))
-    return list(source)
+        sources.update(retrieve(collection_id, request))
+    return list(sources)
 
 
 def _set_bound_coords(ds: xr.Dataset) -> xr.Dataset:
@@ -410,16 +426,6 @@ def _preprocess(
     return harmonise(ds, collection_id)
 
 
-def get_data(source: list[str]) -> Any:
-    if len(source) == 1:
-        return emohawk.open(source[0])
-
-    # TODO: emohawk not able to open a list of files
-    emohwak_dir = emohawk.readers.directory.DirectoryReader("")
-    emohwak_dir._content = source
-    return emohwak_dir
-
-
 def _download_and_transform_requests(
     collection_id: str,
     request_list: list[dict[str, Any]],
@@ -427,40 +433,50 @@ def _download_and_transform_requests(
     transform_func_kwargs: dict[str, Any],
     **open_mfdataset_kwargs: Any,
 ) -> xr.Dataset:
-    # TODO: Ideally, we would always use emohawk.
-    # However, there is not a consistent behavior across backends.
-    # For example, GRIB silently ignore open_mfdataset_kwargs
     sources = get_sources(collection_id, request_list)
-    try:
-        engine = open_mfdataset_kwargs.get(
-            "engine",
-            {xr.backends.plugins.guess_engine(source) for source in sources},
-        )
-        use_emohawk = len(engine) != 1
-    except ValueError:
-        use_emohawk = True
-
-    open_mfdataset_kwargs["preprocess"] = functools.partial(
+    preprocess = functools.partial(
         _preprocess,
         collection_id=collection_id,
-        preprocess=open_mfdataset_kwargs.get("preprocess", None),
+        preprocess=open_mfdataset_kwargs.pop("preprocess", None),
     )
 
-    if use_emohawk:
-        data = get_data(sources)
-        if isinstance(data, emohawk.readers.shapefile.ShapefileReader):
-            # FIXME: emohawk NotImplementedError
-            ds: xr.Dataset = data.to_pandas().to_xarray()
-        else:
-            ds = data.to_xarray(
-                xarray_open_mfdataset_kwargs=open_mfdataset_kwargs,
-                **TO_XARRAY_KWARGS,
-            )
-        if not isinstance(ds, xr.Dataset):
-            # When emohawk fails to concat, it silently return a list
-            raise TypeError(f"`emohawk` returned {type(ds)} instead of a xr.Dataset")
+    grib_ext = (".grib", ".grb", ".grb1", ".grb2")
+    ext_to_skip = (".png", ".json")
+    if all(
+        isinstance(source, str) and source.endswith(grib_ext + ext_to_skip)
+        for source in sources
+    ):
+        # TODO: Avoid memory issues
+        # https://github.com/ecmwf/earthkit-data/issues/378
+        # https://github.com/ecmwf/earthkit-data/issues/400
+        open_mfdataset_kwargs["preprocess"] = preprocess
+        ds = xr.open_mfdataset(
+            [source for source in sources if not source.endswith(ext_to_skip)],
+            **open_mfdataset_kwargs,
+        )
     else:
-        ds = xr.open_mfdataset(sources, **open_mfdataset_kwargs)
+        ek_ds = earthkit.data.from_source("file", sources)
+        if isinstance(ek_ds, GribFieldList):
+            # TODO: squeeze=True is cfgrib default
+            # https://github.com/ecmwf/earthkit-data/issues/374
+            open_dataset_kwargs = {
+                "chunks": {},
+                "squeeze": True,
+            } | open_mfdataset_kwargs
+            ds = ek_ds.to_xarray(xarray_open_dataset_kwargs=open_dataset_kwargs)
+            ds = preprocess(ds)
+        elif (
+            isinstance(ek_ds, File) and isinstance(ek_ds._reader, CSVReader)
+        ) or isinstance(ek_ds, ShapeFileReader):
+            assert not open_mfdataset_kwargs
+            ds = preprocess(ek_ds.to_xarray())
+        else:
+            open_mfdataset_kwargs["preprocess"] = preprocess
+            ds = ek_ds.to_xarray(xarray_open_mfdataset_kwargs=open_mfdataset_kwargs)
+        if not isinstance(ds, xr.Dataset):
+            raise TypeError(
+                f"`earthkit.data` returned {type(ds)} instead of a xr.Dataset"
+            )
 
     if transform_func is not None:
         with cacholote.config.set(return_cache_entry=False):
@@ -481,7 +497,7 @@ def _delayed_download(
     collection_id: str, request: dict[str, Any], config: cacholote.config.Settings
 ) -> None:
     with cacholote.config.set(**dict(config)):
-        _cached_retrieve(collection_id, request)
+        retrieve(collection_id, request)
 
 
 def download_and_transform(
@@ -568,7 +584,15 @@ def download_and_transform(
     for request in ensure_list(requests):
         request_list.extend(split_request(request, chunks, split_all))
 
+    if invalidate_cache and not use_cache:
+        # Delete raw data
+        for request in request_list:
+            cacholote.delete(
+                _cached_retrieve, collection_id=collection_id, request=request
+            )
+
     if n_jobs != 1:
+        assert not NOCACHE, "n_jobs must be 1 when NOCACHE is True"
         # Download all data in parallel
         joblib.Parallel(n_jobs=n_jobs)(
             _delayed_download(collection_id, request, cacholote.config.get())
