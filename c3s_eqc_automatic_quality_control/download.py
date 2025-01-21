@@ -463,7 +463,9 @@ def _download_and_transform_requests(
                 "chunks": {},
                 "squeeze": True,
             } | open_mfdataset_kwargs
-            ds = ek_ds.to_xarray(xarray_open_dataset_kwargs=open_dataset_kwargs)
+            ds = ek_ds.to_xarray(
+                engine="cfgrib", xarray_open_dataset_kwargs=open_dataset_kwargs
+            )
             ds = preprocess(ds)
         elif (
             isinstance(ek_ds, File) and isinstance(ek_ds._reader, CSVReader)
