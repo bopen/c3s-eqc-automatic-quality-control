@@ -4,8 +4,11 @@ import numpy as np
 import pytest
 import xarray as xr
 import xskillscore as xs
+from packaging.version import Version
 
 from c3s_eqc_automatic_quality_control import diagnostics
+
+WEIGHTED_POLYFIT_IS_BROKEN = Version(xr.__version__) >= Version("v2024.11.0")
 
 
 @overload
@@ -57,7 +60,7 @@ class TestTimeWeighted:
         else:
             expected = obj.mean("time")
         actual = diagnostics.time_weighted_mean(obj, weights=weights)
-        xr.testing.assert_equal(expected, actual)
+        xr.testing.assert_allclose(expected, actual)
 
     def test_time_weighted_std(
         self, obj: xr.DataArray | xr.Dataset, weights: bool
@@ -68,7 +71,7 @@ class TestTimeWeighted:
         else:
             expected = obj.std("time")
         actual = diagnostics.time_weighted_std(obj, weights=weights)
-        xr.testing.assert_equal(expected, actual)
+        xr.testing.assert_allclose(expected, actual)
 
     def test_monthly_weighted_mean(
         self, obj: xr.DataArray | xr.Dataset, weights: bool
@@ -79,7 +82,7 @@ class TestTimeWeighted:
         else:
             expected = obj.groupby("time.month").mean("time")
         actual = diagnostics.monthly_weighted_mean(obj, weights=weights)
-        xr.testing.assert_equal(expected, actual)
+        xr.testing.assert_allclose(expected, actual)
 
     def test_seasonal_weighted_mean(
         self, obj: xr.DataArray | xr.Dataset, weights: bool
@@ -90,7 +93,7 @@ class TestTimeWeighted:
         else:
             expected = obj.groupby("time.season").mean("time")
         actual = diagnostics.seasonal_weighted_mean(obj, weights=weights)
-        xr.testing.assert_equal(expected, actual)
+        xr.testing.assert_allclose(expected, actual)
 
     def test_monthly_weighted_std(
         self, obj: xr.DataArray | xr.Dataset, weights: bool
@@ -101,7 +104,7 @@ class TestTimeWeighted:
         else:
             expected = obj.groupby("time.month").std("time")
         actual = diagnostics.monthly_weighted_std(obj, weights=weights)
-        xr.testing.assert_equal(expected, actual)
+        xr.testing.assert_allclose(expected, actual)
 
     def test_seasonal_weighted_std(
         self, obj: xr.DataArray | xr.Dataset, weights: bool
@@ -112,7 +115,7 @@ class TestTimeWeighted:
         else:
             expected = obj.groupby("time.season").std("time")
         actual = diagnostics.seasonal_weighted_std(obj, weights=weights)
-        xr.testing.assert_equal(expected, actual)
+        xr.testing.assert_allclose(expected, actual)
 
     def test_annual_weighted_mean(
         self, obj: xr.DataArray | xr.Dataset, weights: bool
@@ -123,22 +126,27 @@ class TestTimeWeighted:
         else:
             expected = obj.groupby("time.year").mean("time")
         actual = diagnostics.annual_weighted_mean(obj, weights=weights)
-        xr.testing.assert_equal(expected, actual)
+        xr.testing.assert_allclose(expected, actual)
 
     def test_annual_weighted_std(
         self, obj: xr.DataArray | xr.Dataset, weights: bool
     ) -> None:
         if weights:
+            if WEIGHTED_POLYFIT_IS_BROKEN:
+                pytest.xfail("See https://github.com/pydata/xarray/issues/9972")
             expected = (obj).groupby("time.year").map(weighted_std)
             expected = expected.where(expected != 0)
         else:
             expected = obj.groupby("time.year").std("time")
         actual = diagnostics.annual_weighted_std(obj, weights=weights)
-        xr.testing.assert_equal(expected, actual)
+        xr.testing.assert_allclose(expected, actual)
 
     def test_time_weighted_linear_trend(
         self, obj: xr.DataArray | xr.Dataset, weights: bool
     ) -> None:
+        if weights and WEIGHTED_POLYFIT_IS_BROKEN:
+            pytest.xfail("See https://github.com/pydata/xarray/issues/9972")
+
         actual = diagnostics.time_weighted_linear_trend(obj, weights=weights)
 
         ds_trend = (
@@ -157,6 +165,9 @@ class TestTimeWeighted:
     def test_time_weighted_linear_trend_stats(
         self, obj: xr.DataArray | xr.Dataset, weights: bool
     ) -> None:
+        if weights and WEIGHTED_POLYFIT_IS_BROKEN:
+            pytest.xfail("See https://github.com/pydata/xarray/issues/9972")
+
         actual_dict = diagnostics.time_weighted_linear_trend(
             obj, weights=weights, p_value=True, r2=True
         )

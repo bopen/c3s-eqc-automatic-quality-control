@@ -110,7 +110,7 @@ class TestSpatialWeighted:
 
 def test_spatial_weighted_rmse_against_sklearn() -> None:
     ds = xr.tutorial.open_dataset("era5-2mt-2019-03-uk.grib")
-    da = ds["t2m"].isel(time=0, longitude=0)
+    da = ds["t2m"].astype("float64").isel(time=0, longitude=0)
     weights = np.cos(np.deg2rad(da["latitude"]))
 
     da1 = da
