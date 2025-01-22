@@ -4,8 +4,11 @@ import numpy as np
 import pytest
 import xarray as xr
 import xskillscore as xs
+from packaging.version import Version
 
 from c3s_eqc_automatic_quality_control import diagnostics
+
+WEIGHTED_POLYFIT_IS_BROKEN = Version(xr.__version__) >= Version("v2024.11.0")
 
 
 @overload
@@ -129,6 +132,8 @@ class TestTimeWeighted:
         self, obj: xr.DataArray | xr.Dataset, weights: bool
     ) -> None:
         if weights:
+            if WEIGHTED_POLYFIT_IS_BROKEN:
+                pytest.xfail("See https://github.com/pydata/xarray/issues/9972")
             expected = (obj).groupby("time.year").map(weighted_std)
             expected = expected.where(expected != 0)
         else:
@@ -139,6 +144,9 @@ class TestTimeWeighted:
     def test_time_weighted_linear_trend(
         self, obj: xr.DataArray | xr.Dataset, weights: bool
     ) -> None:
+        if weights and WEIGHTED_POLYFIT_IS_BROKEN:
+            pytest.xfail("See https://github.com/pydata/xarray/issues/9972")
+
         actual = diagnostics.time_weighted_linear_trend(obj, weights=weights)
 
         ds_trend = (
@@ -157,6 +165,9 @@ class TestTimeWeighted:
     def test_time_weighted_linear_trend_stats(
         self, obj: xr.DataArray | xr.Dataset, weights: bool
     ) -> None:
+        if weights and WEIGHTED_POLYFIT_IS_BROKEN:
+            pytest.xfail("See https://github.com/pydata/xarray/issues/9972")
+
         actual_dict = diagnostics.time_weighted_linear_trend(
             obj, weights=weights, p_value=True, r2=True
         )
