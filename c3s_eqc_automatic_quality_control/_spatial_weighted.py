@@ -8,9 +8,12 @@ import xarray as xr
 from typing_extensions import TypedDict
 
 try:
-    from xarray.core.weighted import DataArrayWeighted, DatasetWeighted
-except ImportError:
     from xarray.computation.weighted import DataArrayWeighted, DatasetWeighted
+except ImportError:
+    from xarray.core.weighted import (  # type: ignore[import-not-found,no-redef]
+        DataArrayWeighted,
+        DatasetWeighted,
+    )
 
 from . import utils
 
