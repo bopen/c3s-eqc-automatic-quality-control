@@ -6,7 +6,11 @@ from typing import Any
 import numpy as np
 import xarray as xr
 from typing_extensions import TypedDict
-from xarray.core.weighted import DataArrayWeighted, DatasetWeighted
+
+try:
+    from xarray.core.weighted import DataArrayWeighted, DatasetWeighted
+except ImportError:
+    from xarray.computation.weighted import DataArrayWeighted, DatasetWeighted
 
 from . import utils
 

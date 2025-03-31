@@ -5,7 +5,11 @@ from typing import Any, overload
 
 import xarray as xr
 import xskillscore as xs
-from xarray.core.weighted import DataArrayWeighted, DatasetWeighted
+
+try:
+    from xarray.core.weighted import DataArrayWeighted, DatasetWeighted
+except ImportError:
+    from xarray.computation.weighted import DataArrayWeighted, DatasetWeighted
 
 from . import utils
 

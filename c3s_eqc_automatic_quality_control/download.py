@@ -16,9 +16,9 @@ This module manages the execution of the quality control.
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import calendar
 import contextlib
+import copy
 import datetime
 import functools
 import itertools
@@ -464,7 +464,10 @@ def _download_and_transform_requests(
                 "squeeze": True,
             } | open_mfdataset_kwargs
             ds = ek_ds.to_xarray(
-                engine="cfgrib", xarray_open_dataset_kwargs=open_dataset_kwargs
+                engine="cfgrib",
+                xarray_open_dataset_kwargs=copy.deepcopy(
+                    open_dataset_kwargs  # https://github.com/ecmwf/earthkit-data/issues/668
+                ),
             )
             ds = preprocess(ds)
         elif (
@@ -474,7 +477,11 @@ def _download_and_transform_requests(
             ds = preprocess(ek_ds.to_xarray())
         else:
             open_mfdataset_kwargs["preprocess"] = preprocess
-            ds = ek_ds.to_xarray(xarray_open_mfdataset_kwargs=open_mfdataset_kwargs)
+            ds = ek_ds.to_xarray(
+                xarray_open_mfdataset_kwargs=copy.deepcopy(
+                    open_mfdataset_kwargs  # https://github.com/ecmwf/earthkit-data/issues/668
+                )
+            )
         if not isinstance(ds, xr.Dataset):
             raise TypeError(
                 f"`earthkit.data` returned {type(ds)} instead of a xr.Dataset"
