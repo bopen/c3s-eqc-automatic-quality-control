@@ -384,7 +384,7 @@ def _set_time_dim(ds: xr.Dataset, collection_id: str) -> xr.Dataset:
         for time in ("forecast_reference_time", "time"):
             if time in ds.variables and len(ds[time].dims) <= 1:
                 if not ds[time].dims:
-                    ds = ds.expand_dims(time)
+                    ds = ds.set_coords(time).expand_dims(time)
                 else:
                     # E.g., satellite-methane
                     ds = ds.swap_dims({ds[time].dims[0]: time})
@@ -621,7 +621,8 @@ def download_and_transform(
                 _set_env(tqdm_disable=True),
             ):
                 sources.append(func(request_list=[request]).result["args"][0]["href"])
-        ds = xr.open_mfdataset(sources, **cached_open_mfdataset_kwargs)
+        with xr.set_options(use_new_combine_kwarg_defaults=True):  # type: ignore[no-untyped-call]
+            ds = xr.open_mfdataset(sources, **cached_open_mfdataset_kwargs)
     else:
         # Cache final dataset transformed
         if invalidate_cache:

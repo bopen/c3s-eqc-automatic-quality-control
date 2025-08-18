@@ -44,13 +44,15 @@ class TestSpatialWeighted:
         actual_median = diagnostics.spatial_weighted_median(obj, weights=weights)
         xr.testing.assert_equal(actual_median, expected_median)
 
-        ds = xr.merge(
-            [
-                expected_mean.expand_dims(diagnostic=["mean"]),
-                expected_median.expand_dims(diagnostic=["median"]),
-                expected_std.expand_dims(diagnostic=["std"]),
-            ],
-        )
+        with xr.set_options(use_new_combine_kwarg_defaults=True):  # type: ignore[no-untyped-call]
+            ds = xr.combine_by_coords(
+                [
+                    expected_mean.expand_dims(diagnostic=["mean"]),
+                    expected_median.expand_dims(diagnostic=["median"]),
+                    expected_std.expand_dims(diagnostic=["std"]),
+                ],
+                coords="minimal",
+            )
         expected_statistics = ds if isinstance(obj, xr.Dataset) else ds["t2m"]
         actual_statistics = diagnostics.spatial_weighted_statistics(
             obj, weights=weights
@@ -103,13 +105,14 @@ class TestSpatialWeighted:
         actual_corr = diagnostics.spatial_weighted_corr(obj1, obj2, weights=weights)
         xr.testing.assert_equal(expected_corr, actual_corr)
 
-        ds = xr.merge(
-            [
-                expected_corr.expand_dims(diagnostic=["corr"]),
-                expected_crmse.expand_dims(diagnostic=["crmse"]),
-                expected_rmse.expand_dims(diagnostic=["rmse"]),
-            ],
-        )
+        with xr.set_options(use_new_combine_kwarg_defaults=True):  # type: ignore[no-untyped-call]
+            ds = xr.combine_by_coords(
+                [
+                    expected_corr.expand_dims(diagnostic=["corr"]),
+                    expected_crmse.expand_dims(diagnostic=["crmse"]),
+                    expected_rmse.expand_dims(diagnostic=["rmse"]),
+                ],
+            )
         expected_errors = ds if isinstance(obj, xr.Dataset) else ds["t2m"]
         actual_errors = diagnostics.spatial_weighted_errors(obj1, obj2, weights=weights)
         xr.testing.assert_equal(expected_errors, actual_errors)

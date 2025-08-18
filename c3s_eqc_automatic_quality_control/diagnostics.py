@@ -600,7 +600,7 @@ def spatial_weighted_statistics(
     median = sw.reduce("quantile", q=0.5, **kwargs).drop_vars("quantile")
     objects.append(median.expand_dims(diagnostic=["median"]))
 
-    ds = xr.merge(objects)
+    ds = xr.merge(objects, join="outer", compat="no_conflicts")
     return ds[obj.name] if isinstance(obj, xr.DataArray) else ds
 
 
@@ -740,7 +740,7 @@ def spatial_weighted_errors(
         else:
             obj = getattr(sw, func)(obj2, **kwargs)
         objects.append(obj.expand_dims(diagnostic=[func]))
-    ds = xr.merge(objects)
+    ds = xr.merge(objects, join="outer", compat="no_conflicts")
     return ds[obj1.name] if isinstance(obj1, xr.DataArray) else ds
 
 
