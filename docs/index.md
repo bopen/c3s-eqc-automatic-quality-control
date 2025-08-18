@@ -6,6 +6,7 @@ C3S EQC Automatic Quality Control.
 :caption: 'Contents:'
 :maxdepth: 2
 
+README.md
 API Reference <_api/c3s_eqc_automatic_quality_control/index>
 ```
 
