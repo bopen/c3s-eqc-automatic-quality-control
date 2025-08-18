@@ -112,7 +112,7 @@ def shaded_std(
 
             rgb = list(rgb)
             dark = f"rgba{tuple(rgb + [1])}"
-            light = f"rgba{tuple(rgb + [.15])}"
+            light = f"rgba{tuple(rgb + [0.15])}"
 
             if hue_dim:
                 label = str(da_mean[hue_dim].values)
@@ -246,7 +246,9 @@ def projected_map(
             ]
             for stat in "min", "max":
                 dataarrays.append(getattr(da, stat)().expand_dims(diagnostic=[stat]))
-            da_stats = xr.merge(dataarrays)[da.name]
+            da_stats = xr.merge(dataarrays, join="outer", compat="no_conflicts")[
+                da.name
+            ]
 
             # Add statistics box
             n_characters = max(map(len, da_stats["diagnostic"].values.tolist()))
@@ -275,9 +277,9 @@ def _infer_legend_dict(da: xr.DataArray) -> dict[str, tuple[ColorType, FLAGS_T]]
     colors = da.attrs["flag_colors"].split()
     meanings = da.attrs["flag_meanings"].split()
 
-    assert (
-        len(flags) == len(meanings) and 0 <= len(flags) - len(colors) <= 1
-    ), "flags/meanings/colors mismatch"
+    assert len(flags) == len(meanings) and 0 <= len(flags) - len(colors) <= 1, (
+        "flags/meanings/colors mismatch"
+    )
     if len(flags) - len(colors) == 1:
         colors.insert(flags.index(0), "#000000")
 
@@ -385,9 +387,9 @@ def lccs_bar(
         da_lccs = da_lccs.where(da_lccs != 0)
 
     if groupby_bins_dims:
-        assert (
-            len(groupby_bins_dims) == 1
-        ), "groupby_bins_dims must have a dimension only"
+        assert len(groupby_bins_dims) == 1, (
+            "groupby_bins_dims must have a dimension only"
+        )
         groupby_dim, *_ = groupby_bins_dims.keys()
         groupby_bins, *_ = groupby_bins_dims.values()
 
