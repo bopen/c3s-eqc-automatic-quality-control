@@ -20,7 +20,7 @@ dependencies = [
   "cf-xarray",
   "cgul",
   "earthkit-data[cds]",
-  "ecmwflibs",
+  "eccodes",
   "fsspec",
   "joblib",
   "matplotlib",
